@@ -1,0 +1,134 @@
+// Mi-Comunidad data model.
+// Conventions: money is stored in EUR cents (Int); ownership coefficients are
+// stored as percentages with 4 decimals (Decimal(7,4)), summing ~100 per comunidad.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MemberRole {
+  PRESIDENT
+  SECRETARY
+  TREASURER
+  VECINO
+}
+
+enum MemberStatus {
+  PENDING
+  ACTIVE
+  REMOVED
+}
+
+enum ApprovalMode {
+  AUTOMATIC
+  MANUAL
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
+/// Mirrors a Supabase auth user. `id` is the Supabase auth.users UUID.
+model User {
+  id        String   @id @db.Uuid
+  email     String?  @unique
+  phone     String?  @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships         ComunidadMember[]
+  invitationsSent     Invitation[]      @relation("InvitationCreatedBy")
+  invitationsAccepted Invitation[]      @relation("InvitationAcceptedBy")
+}
+
+model Comunidad {
+  id           String       @id @default(cuid())
+  name         String
+  address      String
+  city         String?
+  postalCode   String?
+  cif          String?
+  unitsCount   Int
+  inviteCode   String       @unique
+  approvalMode ApprovalMode @default(AUTOMATIC)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  units       Unit[]
+  members     ComunidadMember[]
+  invitations Invitation[]
+}
+
+/// A flat, local, garage or storage room with its ownership coefficient (LPH art. 5).
+model Unit {
+  id          String   @id @default(cuid())
+  comunidadId String
+  label       String
+  floor       String?
+  door        String?
+  coefficient Decimal  @default(0) @db.Decimal(7, 4)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  comunidad   Comunidad         @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  members     ComunidadMember[]
+  invitations Invitation[]
+
+  @@unique([comunidadId, label])
+  @@index([comunidadId])
+}
+
+model ComunidadMember {
+  id          String       @id @default(cuid())
+  comunidadId String
+  userId      String       @db.Uuid
+  unitId      String?
+  role        MemberRole   @default(VECINO)
+  status      MemberStatus @default(ACTIVE)
+  displayName String
+  phone       String?
+  email       String?
+  joinedAt    DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  comunidad Comunidad @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unit      Unit?     @relation(fields: [unitId], references: [id], onDelete: SetNull)
+
+  @@unique([comunidadId, userId])
+  @@index([userId])
+  @@index([unitId])
+}
+
+model Invitation {
+  id           String           @id @default(cuid())
+  comunidadId  String
+  code         String           @unique
+  unitId       String?
+  name         String?
+  email        String?
+  phone        String?
+  role         MemberRole       @default(VECINO)
+  status       InvitationStatus @default(PENDING)
+  createdById  String           @db.Uuid
+  acceptedById String?          @db.Uuid
+  sentAt       DateTime?
+  acceptedAt   DateTime?
+  expiresAt    DateTime?
+  createdAt    DateTime         @default(now())
+
+  comunidad  Comunidad @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  unit       Unit?     @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  createdBy  User      @relation("InvitationCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  acceptedBy User?     @relation("InvitationAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([comunidadId])
+}
