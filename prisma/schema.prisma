@@ -1,0 +1,638 @@
+// Mi-Comunidad data model.
+// Conventions: money is stored in EUR cents (Int); ownership coefficients are
+// stored as percentages with 4 decimals (Decimal(7,4)), summing ~100 per comunidad.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MemberRole {
+  PRESIDENT
+  SECRETARY
+  TREASURER
+  VECINO
+}
+
+enum MemberStatus {
+  PENDING
+  ACTIVE
+  REMOVED
+}
+
+enum Plan {
+  GRATIS
+  COMUNIDAD
+  PRO
+  ADMINISTRADOR
+}
+
+enum SubscriptionStatus {
+  NONE
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  UNPAID
+  INCOMPLETE
+  CANCELED
+}
+
+enum BillingEventType {
+  TRIAL_STARTED
+  SUBSCRIBED
+  PLAN_CHANGED
+  PAYMENT_SUCCEEDED
+  PAYMENT_FAILED
+  REFERRAL_CREDIT
+  CANCELED
+}
+
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+}
+
+enum ApprovalMode {
+  AUTOMATIC
+  MANUAL
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
+enum IncidenciaStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum IncidenciaPriority {
+  NORMAL
+  URGENT
+}
+
+enum IncidenciaLocation {
+  PORTAL
+  ESCALERA
+  ASCENSOR
+  GARAJE
+  TERRAZA
+  FACHADA
+  PISCINA
+  ZONAS_COMUNES
+  OTRO
+}
+
+enum JuntaType {
+  ORDINARIA
+  EXTRAORDINARIA
+}
+
+enum JuntaStatus {
+  DRAFT
+  CONVOCADA
+  EN_CURSO
+  CERRADA
+  CANCELADA
+}
+
+/// LPH art. 17 majority rules.
+enum MajorityType {
+  SIMPLE
+  THREE_FIFTHS
+  UNANIMITY
+  INFORMATIVE
+}
+
+enum AgendaItemResult {
+  APPROVED
+  REJECTED
+  /// Unanimity reached among attendees; absent owners have 30 days to object (LPH art. 17.8).
+  PROVISIONAL
+  NO_VOTE
+}
+
+enum VoteChoice {
+  YES
+  NO
+  ABSTAIN
+}
+
+enum AttendanceType {
+  IN_PERSON
+  REMOTE
+  PROXY
+}
+
+enum CuotaMode {
+  FIXED
+  COEFFICIENT
+}
+
+enum CuotaKind {
+  ORDINARIA
+  DERRAMA
+}
+
+enum CuotaStatus {
+  PENDING
+  PAID
+}
+
+enum DocumentCategory {
+  ACTA
+  ESTATUTOS
+  SEGURO
+  PRESUPUESTO
+  CONTRATO
+  FACTURA
+  CERTIFICADO
+  OTRO
+}
+
+/// Mirrors a Supabase auth user. `id` is the Supabase auth.users UUID.
+model User {
+  id            String    @id @db.Uuid
+  email         String?   @unique
+  phone         String?   @unique
+  name          String?
+  /// Product/lifecycle emails (onboarding tips, win-back). Transactional notices are always sent.
+  productEmails Boolean   @default(true)
+  /// Set when the user exercised the right to erasure (data anonymised).
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  memberships         ComunidadMember[]
+  invitationsSent     Invitation[]      @relation("InvitationCreatedBy")
+  invitationsAccepted Invitation[]      @relation("InvitationAcceptedBy")
+  npsResponses        NpsResponse[]
+}
+
+model Comunidad {
+  id           String       @id @default(cuid())
+  name         String
+  address      String
+  city         String?
+  postalCode   String?
+  cif          String?
+  unitsCount   Int
+  inviteCode   String       @unique
+  approvalMode ApprovalMode @default(AUTOMATIC)
+
+  /// Monthly cuota configuration (amounts in EUR cents).
+  cuotaMode              CuotaMode @default(FIXED)
+  cuotaFixedCents        Int       @default(0)
+  /// Annual budget split by coefficient when cuotaMode = COEFFICIENT.
+  cuotaAnnualBudgetCents Int       @default(0)
+  /// Day of month cuotas are due (1-28).
+  cuotaDueDay            Int       @default(10)
+
+  /// Billing (Stripe). `plan` is the subscribed plan; entitlements are derived in src/lib/entitlements.ts.
+  plan                 Plan               @default(GRATIS)
+  subscriptionStatus   SubscriptionStatus @default(NONE)
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
+  /// In-app trial of the Comunidad plan (no card required).
+  trialEndsAt          DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+
+  /// Engagement bookkeeping.
+  onboardingDismissedAt DateTime?
+  trialReminderSentAt   DateTime?
+  activationNudgeSentAt DateTime?
+  winbackSentAt         DateTime?
+
+  /// Referral programme. Code "MC-XXXX" is generated lazily (src/lib/referrals.ts).
+  referralCode               String?     @unique
+  referredById               String?
+  referredBy                 Comunidad?  @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals                  Comunidad[] @relation("Referrals")
+  /// Stamped when this (referred) comunidad first subscribes to a paid plan.
+  referralConvertedAt        DateTime?
+  /// Day-21 follow-up email sent to the referrer about this comunidad.
+  referralFollowUpSentAt     DateTime?
+  /// Reward (EUR cents) granted to the referrer for this conversion.
+  referralRewardCents        Int         @default(0)
+  /// Referral credit earned but not yet applied to a Stripe customer (EUR cents).
+  referralCreditPendingCents Int         @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  units         Unit[]
+  members       ComunidadMember[]
+  invitations   Invitation[]
+  announcements Announcement[]
+  incidencias   Incidencia[]
+  documents     Document[]
+  juntas        Junta[]
+  cuotas        Cuota[]
+  derramas      Derrama[]
+  billingEvents BillingEvent[]
+  notifications NotificationLog[]
+  npsResponses  NpsResponse[]
+
+  @@index([referredById])
+}
+
+/// A flat, local, garage or storage room with its ownership coefficient (LPH art. 5).
+model Unit {
+  id          String   @id @default(cuid())
+  comunidadId String
+  label       String
+  floor       String?
+  door        String?
+  coefficient Decimal  @default(0) @db.Decimal(7, 4)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  comunidad   Comunidad         @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  members     ComunidadMember[]
+  invitations Invitation[]
+  votes       Vote[]
+  attendances JuntaAttendance[]
+  proxies     ProxyDelegation[]
+  cuotas      Cuota[]
+
+  @@unique([comunidadId, label])
+  @@index([comunidadId])
+}
+
+model ComunidadMember {
+  id             String       @id @default(cuid())
+  comunidadId    String
+  userId         String       @db.Uuid
+  unitId         String?
+  role           MemberRole   @default(VECINO)
+  status         MemberStatus @default(ACTIVE)
+  displayName    String
+  phone          String?
+  email          String?
+  /// Notification preference: receive notifications by email.
+  notifyEmail    Boolean      @default(true)
+  /// Opt-in to WhatsApp notifications (requires `phone`).
+  notifyWhatsApp Boolean      @default(false)
+  joinedAt       DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  comunidad Comunidad @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unit      Unit?     @relation(fields: [unitId], references: [id], onDelete: SetNull)
+
+  announcements     Announcement[]
+  announcementReads AnnouncementRead[]
+  incidencias       Incidencia[]
+  incidenciaUpdates IncidenciaUpdate[]
+  documents         Document[]
+  juntasCreated     Junta[]
+  votesCast         Vote[]
+  rsvps             JuntaRsvp[]
+  proxiesGiven      ProxyDelegation[]  @relation("ProxyFrom")
+  proxiesReceived   ProxyDelegation[]  @relation("ProxyTo")
+  notificationLogs  NotificationLog[]
+
+  @@unique([comunidadId, userId])
+  @@index([userId])
+  @@index([unitId])
+}
+
+model Invitation {
+  id           String           @id @default(cuid())
+  comunidadId  String
+  code         String           @unique
+  unitId       String?
+  name         String?
+  email        String?
+  phone        String?
+  role         MemberRole       @default(VECINO)
+  status       InvitationStatus @default(PENDING)
+  createdById  String           @db.Uuid
+  acceptedById String?          @db.Uuid
+  sentAt       DateTime?
+  acceptedAt   DateTime?
+  expiresAt    DateTime?
+  createdAt    DateTime         @default(now())
+
+  comunidad  Comunidad @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  unit       Unit?     @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  createdBy  User      @relation("InvitationCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  acceptedBy User?     @relation("InvitationAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([comunidadId])
+}
+
+model Announcement {
+  id              String    @id @default(cuid())
+  comunidadId     String
+  authorId        String
+  title           String
+  body            String
+  imagePath       String?
+  pinned          Boolean   @default(false)
+  urgent          Boolean   @default(false)
+  notifyEmail     Boolean   @default(true)
+  notifiedAt      DateTime?
+  recipientsCount Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  comunidad Comunidad          @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  author    ComunidadMember    @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  reads     AnnouncementRead[]
+
+  @@index([comunidadId, pinned, createdAt])
+}
+
+model AnnouncementRead {
+  announcementId String
+  memberId       String
+  readAt         DateTime @default(now())
+
+  announcement Announcement    @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  member       ComunidadMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@id([announcementId, memberId])
+}
+
+model Incidencia {
+  id          String             @id @default(cuid())
+  comunidadId String
+  reporterId  String
+  title       String
+  description String
+  location    IncidenciaLocation @default(OTRO)
+  priority    IncidenciaPriority @default(NORMAL)
+  status      IncidenciaStatus   @default(OPEN)
+  /// Free text: provider or person handling it (e.g. "Thyssen").
+  assignedTo  String?
+  photoPaths  String[]
+  resolvedAt  DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  comunidad Comunidad          @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  reporter  ComunidadMember    @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  updates   IncidenciaUpdate[]
+
+  @@index([comunidadId, status])
+}
+
+model IncidenciaUpdate {
+  id           String            @id @default(cuid())
+  incidenciaId String
+  authorId     String
+  status       IncidenciaStatus?
+  note         String?
+  createdAt    DateTime          @default(now())
+
+  incidencia Incidencia      @relation(fields: [incidenciaId], references: [id], onDelete: Cascade)
+  author     ComunidadMember @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([incidenciaId])
+}
+
+model Document {
+  id           String           @id @default(cuid())
+  comunidadId  String
+  uploadedById String
+  title        String
+  category     DocumentCategory
+  year         Int
+  storagePath  String
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  createdAt    DateTime         @default(now())
+
+  comunidad  Comunidad       @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  uploadedBy ComunidadMember @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@index([comunidadId, year])
+}
+
+model Junta {
+  id               String      @id @default(cuid())
+  comunidadId      String
+  createdById      String
+  type             JuntaType   @default(ORDINARIA)
+  status           JuntaStatus @default(DRAFT)
+  /// First call (primera convocatoria).
+  scheduledAt      DateTime
+  /// Second call (segunda convocatoria), usually 30 minutes later.
+  secondCallAt     DateTime?
+  location         String
+  notes            String?
+  convocadaAt      DateTime?
+  recipientsCount  Int         @default(0)
+  reminderSentAt   DateTime?
+  startedAt        DateTime?
+  /// Held on second call (affects quorum and simple majority, LPH arts. 16-17).
+  heldOnSecondCall Boolean     @default(false)
+  presidentName    String?
+  secretaryName    String?
+  closedAt         DateTime?
+  actaNotes        String?
+  actaPublishedAt  DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  comunidad   Comunidad         @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  createdBy   ComunidadMember   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  agendaItems AgendaItem[]
+  attendances JuntaAttendance[]
+  proxies     ProxyDelegation[]
+  rsvps       JuntaRsvp[]
+
+  @@index([comunidadId, scheduledAt])
+}
+
+model AgendaItem {
+  id          String            @id @default(cuid())
+  juntaId     String
+  order       Int
+  title       String
+  description String?
+  majority    MajorityType      @default(SIMPLE)
+  votingOpen  Boolean           @default(false)
+  votingDone  Boolean           @default(false)
+  result      AgendaItemResult?
+  /// Agreement text recorded in the acta.
+  resolution  String?
+
+  junta Junta  @relation(fields: [juntaId], references: [id], onDelete: Cascade)
+  votes Vote[]
+
+  @@index([juntaId, order])
+}
+
+/// One vote per unit and agenda item, weighted by the unit coefficient.
+model Vote {
+  id             String     @id @default(cuid())
+  agendaItemId   String
+  unitId         String
+  choice         VoteChoice
+  castByMemberId String?
+  castAt         DateTime   @default(now())
+
+  agendaItem AgendaItem       @relation(fields: [agendaItemId], references: [id], onDelete: Cascade)
+  unit       Unit             @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  castBy     ComunidadMember? @relation(fields: [castByMemberId], references: [id], onDelete: SetNull)
+
+  @@unique([agendaItemId, unitId])
+}
+
+model JuntaAttendance {
+  id                 String         @id @default(cuid())
+  juntaId            String
+  unitId             String
+  type               AttendanceType
+  representativeName String?
+  createdAt          DateTime       @default(now())
+
+  junta Junta @relation(fields: [juntaId], references: [id], onDelete: Cascade)
+  unit  Unit  @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([juntaId, unitId])
+}
+
+/// A unit owner delegates their vote to another member (LPH art. 15.1).
+model ProxyDelegation {
+  id           String   @id @default(cuid())
+  juntaId      String
+  unitId       String
+  fromMemberId String
+  toMemberId   String
+  createdAt    DateTime @default(now())
+
+  junta      Junta           @relation(fields: [juntaId], references: [id], onDelete: Cascade)
+  unit       Unit            @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  fromMember ComunidadMember @relation("ProxyFrom", fields: [fromMemberId], references: [id], onDelete: Cascade)
+  toMember   ComunidadMember @relation("ProxyTo", fields: [toMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([juntaId, unitId])
+}
+
+model JuntaRsvp {
+  id        String   @id @default(cuid())
+  juntaId   String
+  memberId  String
+  attending Boolean
+  updatedAt DateTime @updatedAt
+
+  junta  Junta           @relation(fields: [juntaId], references: [id], onDelete: Cascade)
+  member ComunidadMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([juntaId, memberId])
+}
+
+/// A charge to a unit: a monthly ordinary cuota or a derrama installment.
+model Cuota {
+  id             String      @id @default(cuid())
+  /// Idempotency key: "{unitId}:{kind}:{period}:{derramaId|-}:{installment}" (see src/lib/cuotas.ts).
+  key            String      @unique
+  comunidadId    String
+  unitId         String
+  kind           CuotaKind   @default(ORDINARIA)
+  /// Billing month "YYYY-MM" (for derramas: the installment's month).
+  period         String
+  derramaId      String?
+  installment    Int         @default(1)
+  amountCents    Int
+  dueDate        DateTime
+  status         CuotaStatus @default(PENDING)
+  paidAt         DateTime?
+  lastReminderAt DateTime?
+  remindersCount Int         @default(0)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  comunidad Comunidad @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  unit      Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  derrama   Derrama?  @relation(fields: [derramaId], references: [id], onDelete: Cascade)
+
+  @@index([comunidadId, period])
+  @@index([comunidadId, status, dueDate])
+}
+
+/// Extraordinary levy, split across units by ownership coefficient.
+model Derrama {
+  id           String   @id @default(cuid())
+  comunidadId  String
+  title        String
+  description  String?
+  totalCents   Int
+  installments Int      @default(1)
+  firstDueDate DateTime
+  createdAt    DateTime @default(now())
+
+  comunidad Comunidad @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  cuotas    Cuota[]
+}
+
+/// Processed Stripe webhook events (idempotency).
+model StripeEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now())
+}
+
+/// Subscription lifecycle log, used for revenue analytics (MRR trend, churn, conversions).
+model BillingEvent {
+  id            String           @id @default(cuid())
+  comunidadId   String
+  type          BillingEventType
+  plan          Plan?
+  /// MRR after this event, in EUR cents.
+  mrrCents      Int              @default(0)
+  amountCents   Int?
+  stripeEventId String?
+  occurredAt    DateTime         @default(now())
+
+  comunidad Comunidad @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+
+  @@index([occurredAt])
+  @@index([comunidadId, occurredAt])
+}
+
+/// Delivery log per member and channel (LPH: evidence that notices were sent).
+model NotificationLog {
+  id          String              @id @default(cuid())
+  comunidadId String
+  memberId    String?
+  channel     NotificationChannel
+  event       String
+  success     Boolean
+  error       String?
+  createdAt   DateTime            @default(now())
+
+  comunidad Comunidad        @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  member    ComunidadMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  @@index([comunidadId, createdAt])
+  @@index([memberId])
+}
+
+/// Net Promoter Score responses. `score` null = prompt dismissed.
+model NpsResponse {
+  id          String   @id @default(cuid())
+  userId      String   @db.Uuid
+  comunidadId String?
+  score       Int?
+  comment     String?
+  createdAt   DateTime @default(now())
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comunidad Comunidad? @relation(fields: [comunidadId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
