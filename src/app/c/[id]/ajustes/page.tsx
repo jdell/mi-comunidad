@@ -8,6 +8,7 @@ import { requireMember } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { leaveComunidad } from "./actions";
 import { ComunidadForm, ProfileForm } from "./forms";
+import { ReferralCard } from "./referral-card";
 
 export const metadata: Metadata = { title: "Ajustes" };
 
@@ -52,6 +53,8 @@ export default async function SettingsPage({ params, searchParams }: PageProps<"
             </CardContent>
           </Card>
         )}
+
+        {member.role === "PRESIDENT" && <ReferralCard comunidadId={id} />}
 
         <Card className="border-destructive/40">
           <CardHeader>

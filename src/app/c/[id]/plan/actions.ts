@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireMember } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { PLANS, type PlanId } from "@/lib/plans";
+import { applyPendingReferralCredit } from "@/lib/referrals";
 import { getStripe, priceIdFor, stripeConfigured } from "@/lib/stripe";
 import { appUrl } from "@/lib/urls";
 
@@ -26,6 +27,8 @@ async function ensureCustomer(comunidadId: string) {
     ...(comunidad.cif ? { tax_id_data: [{ type: "es_cif", value: comunidad.cif }] } : {}),
   });
   await db.comunidad.update({ where: { id: comunidadId }, data: { stripeCustomerId: customer.id } });
+  // Referral months earned before having a Stripe customer become customer credit (applied to the first invoice).
+  await applyPendingReferralCredit(comunidadId, customer.id);
   return customer.id;
 }
 

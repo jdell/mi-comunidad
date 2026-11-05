@@ -1,11 +1,14 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { generateCode, normalizeCode } from "@/lib/codes";
 import { db } from "@/lib/db";
 import { TRIAL_DAYS } from "@/lib/entitlements";
+import { REFERRAL_COOKIE } from "@/lib/referral-code";
+import { resolveReferrer } from "@/lib/referrals";
 import { generateUnits } from "@/lib/units";
 import { cifSchema, fieldErrors, type ActionState } from "@/lib/validation";
 
@@ -41,6 +44,10 @@ export async function createComunidad(_prev: ActionState, formData: FormData): P
   if (!parsed.success) return fieldErrors(parsed.error);
   const data = parsed.data;
 
+  // Referral: from the form (?ref on /onboarding) or the cookie set by the proxy. Invalid codes are ignored.
+  const cookieStore = await cookies();
+  const referrer = await resolveReferrer(String(formData.get("ref") ?? "") || cookieStore.get(REFERRAL_COOKIE)?.value, { userId: user.id });
+
   const units = generateUnits({ count: data.unitsCount, floors: data.floors, doorsPerFloor: data.doorsPerFloor });
 
   const comunidad = await db.$transaction(async (tx) => {
@@ -54,6 +61,7 @@ export async function createComunidad(_prev: ActionState, formData: FormData): P
         unitsCount: units.length,
         inviteCode: generateCode(8),
         trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86_400_000),
+        referredById: referrer?.id ?? null,
         units: { createMany: { data: units } },
         billingEvents: { create: { type: "TRIAL_STARTED", plan: "COMUNIDAD" } },
       },
@@ -74,6 +82,7 @@ export async function createComunidad(_prev: ActionState, formData: FormData): P
     return created;
   });
 
+  cookieStore.delete(REFERRAL_COOKIE);
   redirect(`/c/${comunidad.id}/unidades?bienvenida=1`);
 }
 

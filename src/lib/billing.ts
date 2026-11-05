@@ -4,6 +4,7 @@ import type { BillingEventType, Plan } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { escapeHtml } from "@/lib/email";
 import { notifyMembers } from "@/lib/notifications";
+import { handleReferralConversion } from "@/lib/referrals";
 import { PLANS } from "@/lib/plans";
 import { getStripe, mapSubscriptionStatus, mrrFor, planForPriceId, subscriptionPeriodEnd } from "@/lib/stripe";
 import { appUrl } from "@/lib/urls";
@@ -60,6 +61,8 @@ export async function syncSubscription(sub: Stripe.Subscription, stripeEventId: 
       data: { comunidadId, type, plan: type === "CANCELED" ? before.plan : plan, mrrCents: isPaid ? mrrFor(plan) : 0, stripeEventId },
     });
   }
+  // Referral: first paid subscription of a referred comunidad rewards its referrer (idempotent).
+  if (type === "SUBSCRIBED") await handleReferralConversion(comunidadId, stripeEventId);
 }
 
 export async function handleCheckoutCompleted(session: Stripe.Checkout.Session, stripeEventId: string) {

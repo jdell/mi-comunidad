@@ -21,6 +21,7 @@ const EVENT_LABELS: Record<string, string> = {
   PAYMENT_SUCCEEDED: "Pago cobrado",
   PAYMENT_FAILED: "Pago fallido",
   CANCELED: "Cancelación",
+  REFERRAL_CREDIT: "Mes gratis por recomendación",
 };
 
 export default async function AdminComunidad({ params }: PageProps<"/admin/comunidades/[id]">) {

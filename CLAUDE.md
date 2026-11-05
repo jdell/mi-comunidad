@@ -75,3 +75,7 @@ New migrations: edit `prisma/schema.prisma`, then `npm run db:migrate -- --name 
   `User.productEmails`.
 - GDPR: `/cuenta` offers data export (`/cuenta/exportar`) and erasure (anonymisation; presidents must hand over first).
   Legal identity for `/privacidad` and `/terminos` comes from `src/lib/legal.ts` (fill in before launch).
+- Referrals (`src/lib/referrals.ts`, pure code helpers in `src/lib/referral-code.ts`): lazy `MC-XXXX` code per comunidad,
+  `?ref=` captured by the proxy into the `mc_ref` cookie (30 days) and applied at comunidad creation. Invalid codes and
+  self-referral are ignored silently. First paid subscription stamps `referralConvertedAt` and grants the referrer one
+  month (their plan price, or Comunidad's) as Stripe customer credit, or pending credit until they have a customer.

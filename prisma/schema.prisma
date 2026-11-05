@@ -47,6 +47,7 @@ enum BillingEventType {
   PLAN_CHANGED
   PAYMENT_SUCCEEDED
   PAYMENT_FAILED
+  REFERRAL_CREDIT
   CANCELED
 }
 
@@ -210,6 +211,20 @@ model Comunidad {
   activationNudgeSentAt DateTime?
   winbackSentAt         DateTime?
 
+  /// Referral programme. Code "MC-XXXX" is generated lazily (src/lib/referrals.ts).
+  referralCode               String?     @unique
+  referredById               String?
+  referredBy                 Comunidad?  @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals                  Comunidad[] @relation("Referrals")
+  /// Stamped when this (referred) comunidad first subscribes to a paid plan.
+  referralConvertedAt        DateTime?
+  /// Day-21 follow-up email sent to the referrer about this comunidad.
+  referralFollowUpSentAt     DateTime?
+  /// Reward (EUR cents) granted to the referrer for this conversion.
+  referralRewardCents        Int         @default(0)
+  /// Referral credit earned but not yet applied to a Stripe customer (EUR cents).
+  referralCreditPendingCents Int         @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -225,6 +240,8 @@ model Comunidad {
   billingEvents BillingEvent[]
   notifications NotificationLog[]
   npsResponses  NpsResponse[]
+
+  @@index([referredById])
 }
 
 /// A flat, local, garage or storage room with its ownership coefficient (LPH art. 5).

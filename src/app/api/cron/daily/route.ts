@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { escapeHtml } from "@/lib/email";
 import { formatDateTime } from "@/lib/format";
 import { notifyMembers } from "@/lib/notifications";
+import { sendReferralFollowUps } from "@/lib/referrals";
 import { sendActivationNudges, sendTrialEndingReminders, sendWinbackEmails } from "@/lib/retention";
 import { appUrl } from "@/lib/urls";
 
@@ -17,13 +18,14 @@ export const maxDuration = 300;
  *  2. Weekly automatic reminders for overdue cuotas.
  *  3. Junta reminders 2 days before.
  *  4. Lifecycle emails: trial ending, activation nudge, inactive win-back.
+ *  5. Day-21 referral follow-up to referring comunidades.
  */
 export async function GET(request: NextRequest) {
   if (!isAuthorizedCron(request)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const now = new Date();
   const period = periodOf(now);
-  const summary = { cuotasCreated: 0, reminderUnits: 0, juntaReminders: 0, trialReminders: 0, activationNudges: 0, winbacks: 0 };
+  const summary = { cuotasCreated: 0, reminderUnits: 0, juntaReminders: 0, trialReminders: 0, activationNudges: 0, winbacks: 0, referralFollowUps: 0 };
 
   const comunidades = await db.comunidad.findMany({
     where: { OR: [{ cuotaFixedCents: { gt: 0 } }, { cuotaAnnualBudgetCents: { gt: 0 } }] },
@@ -56,6 +58,7 @@ export async function GET(request: NextRequest) {
   summary.trialReminders = await sendTrialEndingReminders(now);
   summary.activationNudges = await sendActivationNudges(now);
   summary.winbacks = await sendWinbackEmails(now);
+  summary.referralFollowUps = await sendReferralFollowUps(now);
 
   return NextResponse.json({ ok: true, ...summary });
 }

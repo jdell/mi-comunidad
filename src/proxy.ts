@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/proxy";
+import { normalizeReferralCode, REFERRAL_COOKIE } from "@/lib/referral-code";
 import { safeNext } from "@/lib/urls";
 
 // Routes that require an authenticated session. Fine-grained authorization
@@ -15,6 +16,13 @@ function isProtected(pathname: string) {
 export async function proxy(request: NextRequest) {
   const { response, user } = await updateSession(request);
   const { pathname, search } = request.nextUrl;
+
+  // Referral links (?ref=MC-XXXX): remember the code for 30 days so it survives sign-in.
+  // Invalid codes are silently ignored.
+  const ref = normalizeReferralCode(request.nextUrl.searchParams.get("ref"));
+  if (ref) {
+    response.cookies.set(REFERRAL_COOKIE, ref, { maxAge: 30 * 86_400, httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/" });
+  }
 
   if (!user && isProtected(pathname)) {
     const loginUrl = request.nextUrl.clone();

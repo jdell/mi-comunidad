@@ -44,7 +44,7 @@ npm run dev
 - **Cuotas:** monthly fees, paid/pending/overdue tracking, reminders, and a derrama calculator.
 - **Billing:** Stripe subscriptions (Gratis / Comunidad / Pro / Administrador) with a 14-day trial and plan gating.
 - **Platform admin (`/admin`):** comunidades and a revenue dashboard (MRR, ARR, churn, trial conversion, NPS).
-- **Engagement:** onboarding checklist, NPS survey, lifecycle emails, and GDPR self-service (data export and erasure).
+- **Engagement:** onboarding checklist, NPS survey, lifecycle emails, a referral programme (one free month per referred comunidad that subscribes), and GDPR self-service (data export and erasure).
 
 ## Scripts
 

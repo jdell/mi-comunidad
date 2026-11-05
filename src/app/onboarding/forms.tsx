@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { createComunidad, goToInvite } from "./actions";
 
-export function CreateComunidadForm({ defaultName }: { defaultName: string }) {
+export function CreateComunidadForm({ defaultName, referralCode }: { defaultName: string; referralCode: string | null }) {
   const [state, action] = useActionState(createComunidad, {});
   const e = state.fieldErrors ?? {};
   return (
@@ -14,6 +14,7 @@ export function CreateComunidadForm({ defaultName }: { defaultName: string }) {
       <CardContent>
         <form action={action} className="space-y-5">
           <FormError state={state} />
+          {referralCode && <input type="hidden" name="ref" value={referralCode} />}
           <Field label="Nombre de la comunidad" htmlFor="name" error={e.name}>
             <Input id="name" name="name" placeholder="C. P. Gran Vía 42" required />
           </Field>

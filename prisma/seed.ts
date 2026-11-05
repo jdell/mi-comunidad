@@ -46,7 +46,8 @@ async function presidentUserId() {
 
 async function reset() {
   await db.comunidad.deleteMany({ where: { inviteCode: { startsWith: "DEMO" } } });
-  await db.user.deleteMany({ where: { email: { endsWith: `@${DEMO_DOMAIN}` } } });
+  const demoIds = [uuid(1), ...VECINOS.map((_, i) => uuid(100 + i)), ...Array.from({ length: 20 }, (_, i) => uuid(500 + i))];
+  await db.user.deleteMany({ where: { OR: [{ email: { endsWith: `@${DEMO_DOMAIN}` } }, { id: { in: demoIds } }] } });
 }
 
 async function seedGranVia() {
@@ -335,10 +336,26 @@ async function seedOthers() {
   }
 }
 
+/** Referral programme demo: Gran Vía referred two comunidades (one converted). */
+async function seedReferrals(granViaId: string) {
+  await db.comunidad.update({ where: { id: granViaId }, data: { referralCode: "MC-GV42" } });
+  const byName = (name: string) => db.comunidad.findFirstOrThrow({ where: { name, inviteCode: { startsWith: "DEMO" } } });
+  const plaza = await byName("C. P. Plaza Nueva 7");
+  const mirador = await byName("Edificio Mirador");
+  const mayor = await byName("C. P. Calle Mayor 3");
+  const puerto = await byName("C. P. Avenida del Puerto 15");
+  await db.comunidad.update({ where: { id: puerto.id }, data: { referralCode: "MC-PU35" } });
+  await db.comunidad.update({ where: { id: plaza.id }, data: { referredById: granViaId, referralConvertedAt: daysAgo(78), referralRewardCents: 900, referralFollowUpSentAt: daysAgo(69) } });
+  await db.comunidad.update({ where: { id: mirador.id }, data: { referredById: granViaId } });
+  await db.comunidad.update({ where: { id: mayor.id }, data: { referredById: puerto.id, referralFollowUpSentAt: daysAgo(139) } });
+  await db.billingEvent.create({ data: { comunidadId: granViaId, type: "REFERRAL_CREDIT", plan: "COMUNIDAD", amountCents: 900, occurredAt: daysAgo(78) } });
+}
+
 async function main() {
   await reset();
   const c = await seedGranVia();
   await seedOthers();
+  await seedReferrals(c.id);
   console.log(`Seeded demo comunidad "${c.name}" (${c.id}). Invite code: ${c.inviteCode}`);
 }
 
