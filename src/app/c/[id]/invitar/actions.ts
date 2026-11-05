@@ -26,7 +26,7 @@ export async function createInvitation(_prev: ActionState, formData: FormData): 
   const parsed = inviteSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return fieldErrors(parsed.error);
   const { comunidadId, unitId, name, email, phone } = parsed.data;
-  const { user, member, comunidad } = await requireMember(comunidadId, MANAGER_ROLES);
+  const { user, member, comunidad } = await requireMember(comunidadId, MANAGER_ROLES, { write: true });
 
   if (unitId) {
     const unit = await db.unit.findFirst({ where: { id: unitId, comunidadId } });

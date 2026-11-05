@@ -24,6 +24,32 @@ enum MemberStatus {
   REMOVED
 }
 
+enum Plan {
+  GRATIS
+  COMUNIDAD
+  PRO
+  ADMINISTRADOR
+}
+
+enum SubscriptionStatus {
+  NONE
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  UNPAID
+  INCOMPLETE
+  CANCELED
+}
+
+enum BillingEventType {
+  TRIAL_STARTED
+  SUBSCRIBED
+  PLAN_CHANGED
+  PAYMENT_SUCCEEDED
+  PAYMENT_FAILED
+  CANCELED
+}
+
 enum ApprovalMode {
   AUTOMATIC
   MANUAL
@@ -158,6 +184,16 @@ model Comunidad {
   /// Day of month cuotas are due (1-28).
   cuotaDueDay            Int       @default(10)
 
+  /// Billing (Stripe). `plan` is the subscribed plan; entitlements are derived in src/lib/entitlements.ts.
+  plan                 Plan               @default(GRATIS)
+  subscriptionStatus   SubscriptionStatus @default(NONE)
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
+  /// In-app trial of the Comunidad plan (no card required).
+  trialEndsAt          DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -170,6 +206,7 @@ model Comunidad {
   juntas        Junta[]
   cuotas        Cuota[]
   derramas      Derrama[]
+  billingEvents BillingEvent[]
 }
 
 /// A flat, local, garage or storage room with its ownership coefficient (LPH art. 5).
@@ -501,4 +538,29 @@ model Derrama {
 
   comunidad Comunidad @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
   cuotas    Cuota[]
+}
+
+/// Processed Stripe webhook events (idempotency).
+model StripeEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now())
+}
+
+/// Subscription lifecycle log, used for revenue analytics (MRR trend, churn, conversions).
+model BillingEvent {
+  id            String           @id @default(cuid())
+  comunidadId   String
+  type          BillingEventType
+  plan          Plan?
+  /// MRR after this event, in EUR cents.
+  mrrCents      Int              @default(0)
+  amountCents   Int?
+  stripeEventId String?
+  occurredAt    DateTime         @default(now())
+
+  comunidad Comunidad @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+
+  @@index([occurredAt])
+  @@index([comunidadId, occurredAt])
 }

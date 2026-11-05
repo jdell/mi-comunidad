@@ -5,7 +5,9 @@ import { PageHeader } from "@/components/app/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { requireMember } from "@/lib/auth";
+import { UpgradeNotice } from "@/components/app/upgrade-notice";
+import { getEntitlements, requireMember } from "@/lib/auth";
+import { hasFeature } from "@/lib/entitlements";
 import { addMonths, periodOf } from "@/lib/cuotas";
 import { db } from "@/lib/db";
 import { formatCents, formatDate } from "@/lib/format";
@@ -17,7 +19,8 @@ export const metadata: Metadata = { title: "Derramas" };
 
 export default async function DerramasPage({ params }: PageProps<"/c/[id]/cuotas/derramas">) {
   const { id } = await params;
-  await requireMember(id, FINANCE_ROLES);
+  const { comunidad } = await requireMember(id, FINANCE_ROLES);
+  const entitlements = await getEntitlements(comunidad);
   const [units, derramas] = await Promise.all([
     db.unit.findMany({
       where: { comunidadId: id },
@@ -37,6 +40,7 @@ export default async function DerramasPage({ params }: PageProps<"/c/[id]/cuotas
         <Link href={`/c/${id}/cuotas`}><ArrowLeft /> Cuotas</Link>
       </Button>
       <PageHeader title="Derramas" description="Gastos extraordinarios repartidos según el coeficiente de cada vivienda." />
+      {!hasFeature(entitlements, "derramas") && <UpgradeNotice comunidadId={id} feature="La calculadora de derramas" />}
 
       {derramas.length > 0 && (
         <div className="mb-6 space-y-3">

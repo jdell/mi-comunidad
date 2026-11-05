@@ -21,7 +21,7 @@ export async function uploadDocument(_prev: ActionState, formData: FormData): Pr
   const parsed = schema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return fieldErrors(parsed.error);
   const { comunidadId, ...data } = parsed.data;
-  const { member } = await requireMember(comunidadId, MANAGER_ROLES);
+  const { member } = await requireMember(comunidadId, MANAGER_ROLES, { feature: "documents" });
 
   const [file] = filesFrom(formData, "file");
   if (!file) return { error: "Selecciona un archivo." };
@@ -56,7 +56,7 @@ export async function uploadDocument(_prev: ActionState, formData: FormData): Pr
 export async function deleteDocument(formData: FormData) {
   const comunidadId = String(formData.get("comunidadId"));
   const documentId = String(formData.get("documentId"));
-  await requireMember(comunidadId, MANAGER_ROLES);
+  await requireMember(comunidadId, MANAGER_ROLES, { feature: "documents" });
   const doc = await db.document.findFirst({ where: { id: documentId, comunidadId } });
   if (!doc) return;
   await db.document.delete({ where: { id: doc.id } });

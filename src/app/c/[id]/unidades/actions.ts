@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
-import { requireMember } from "@/lib/auth";
+import { getEntitlements, requireMember } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { MANAGER_ROLES } from "@/lib/roles";
 import { equalCoefficients } from "@/lib/units";
@@ -30,7 +30,13 @@ export async function saveUnit(_prev: ActionState, formData: FormData): Promise<
   const parsed = unitSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos no válidos" };
   const { comunidadId, unitId, ...data } = parsed.data;
-  await requireMember(comunidadId, MANAGER_ROLES);
+  const { comunidad } = await requireMember(comunidadId, MANAGER_ROLES);
+  if (!unitId) {
+    const { unitLimit } = await getEntitlements(comunidad);
+    if (unitLimit !== null && comunidad.unitsCount + 1 > unitLimit) {
+      return { error: `Tu plan permite hasta ${unitLimit} viviendas. Cambia de plan para añadir más.` };
+    }
+  }
 
   const values = { label: data.label, floor: data.floor || null, door: data.door || null, coefficient: data.coefficient };
   try {

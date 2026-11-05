@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { generateCode, normalizeCode } from "@/lib/codes";
 import { db } from "@/lib/db";
+import { TRIAL_DAYS } from "@/lib/entitlements";
 import { generateUnits } from "@/lib/units";
 import { cifSchema, fieldErrors, type ActionState } from "@/lib/validation";
 
@@ -52,7 +53,9 @@ export async function createComunidad(_prev: ActionState, formData: FormData): P
         cif: data.cif || null,
         unitsCount: units.length,
         inviteCode: generateCode(8),
+        trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86_400_000),
         units: { createMany: { data: units } },
+        billingEvents: { create: { type: "TRIAL_STARTED", plan: "COMUNIDAD" } },
       },
     });
     await tx.comunidadMember.create({

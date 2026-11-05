@@ -29,7 +29,7 @@ export async function saveAnnouncement(_prev: ActionState, formData: FormData): 
   const parsed = schema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return fieldErrors(parsed.error);
   const { comunidadId, announcementId, removeImage, ...data } = parsed.data;
-  const { member, comunidad } = await requireMember(comunidadId, MANAGER_ROLES);
+  const { member, comunidad } = await requireMember(comunidadId, MANAGER_ROLES, { feature: "announcements" });
 
   const existing = announcementId
     ? await db.announcement.findFirst({ where: { id: announcementId, comunidadId } })
@@ -92,7 +92,7 @@ export async function saveAnnouncement(_prev: ActionState, formData: FormData): 
 export async function togglePin(formData: FormData) {
   const comunidadId = String(formData.get("comunidadId"));
   const announcementId = String(formData.get("announcementId"));
-  await requireMember(comunidadId, MANAGER_ROLES);
+  await requireMember(comunidadId, MANAGER_ROLES, { feature: "announcements" });
   const a = await db.announcement.findFirst({ where: { id: announcementId, comunidadId } });
   if (!a) return;
   await db.announcement.update({ where: { id: a.id }, data: { pinned: !a.pinned } });
@@ -103,7 +103,7 @@ export async function togglePin(formData: FormData) {
 export async function deleteAnnouncement(formData: FormData) {
   const comunidadId = String(formData.get("comunidadId"));
   const announcementId = String(formData.get("announcementId"));
-  await requireMember(comunidadId, MANAGER_ROLES);
+  await requireMember(comunidadId, MANAGER_ROLES, { feature: "announcements" });
   const a = await db.announcement.findFirst({ where: { id: announcementId, comunidadId } });
   if (!a) return;
   await db.announcement.delete({ where: { id: a.id } });

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireMember } from "@/lib/auth";
+import type { PlanFeature } from "@/lib/plans";
 import { db } from "@/lib/db";
 import { escapeHtml } from "@/lib/email";
 import { formatDateTime } from "@/lib/format";
@@ -63,7 +64,7 @@ export async function saveJunta(_prev: ActionState, formData: FormData): Promise
   const parsed = juntaSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return fieldErrors(parsed.error);
   const { comunidadId, juntaId, agenda, secondCallMinutes, ...data } = parsed.data;
-  const { member } = await requireMember(comunidadId, MANAGER_ROLES);
+  const { member } = await requireMember(comunidadId, MANAGER_ROLES, { feature: "junta_basic" });
 
   const scheduledAt = parseMadridLocal(data.scheduledAt);
   if (!scheduledAt) return { error: "Fecha no válida", fieldErrors: { scheduledAt: ["Fecha no válida"] } };
@@ -98,10 +99,10 @@ export async function saveJunta(_prev: ActionState, formData: FormData): Promise
   redirect(path(comunidadId, id));
 }
 
-async function managerJunta(formData: FormData) {
+async function managerJunta(formData: FormData, feature?: PlanFeature) {
   const comunidadId = String(formData.get("comunidadId"));
   const juntaId = String(formData.get("juntaId"));
-  const ctx = await requireMember(comunidadId, MANAGER_ROLES);
+  const ctx = await requireMember(comunidadId, MANAGER_ROLES, feature ? { feature } : undefined);
   const junta = await db.junta.findFirst({ where: { id: juntaId, comunidadId } });
   if (!junta) redirect(path(comunidadId));
   return { ...ctx, comunidadId, junta };
@@ -134,7 +135,7 @@ function agendaHtml(items: { order: number; title: string }[]) {
 }
 
 export async function sendConvocatoria(formData: FormData) {
-  const { comunidadId, junta, comunidad, member } = await managerJunta(formData);
+  const { comunidadId, junta, comunidad, member } = await managerJunta(formData, "junta_basic");
   if (junta.status !== "DRAFT") return;
   const notice = noticeError(junta.type, junta.scheduledAt);
   if (notice) redirect(`${path(comunidadId, junta.id)}?error=${encodeURIComponent(notice)}`);
@@ -162,7 +163,7 @@ export async function sendConvocatoria(formData: FormData) {
 }
 
 export async function sendJuntaReminder(formData: FormData) {
-  const { comunidadId, junta, comunidad } = await managerJunta(formData);
+  const { comunidadId, junta, comunidad } = await managerJunta(formData, "junta_basic");
   if (junta.status !== "CONVOCADA") return;
   await notifyMembers({
     comunidadId,
@@ -183,7 +184,7 @@ export async function rsvp(formData: FormData) {
   const comunidadId = String(formData.get("comunidadId"));
   const juntaId = String(formData.get("juntaId"));
   const attending = formData.get("attending") === "yes";
-  const { member } = await requireMember(comunidadId);
+  const { member } = await requireMember(comunidadId, undefined, { feature: "junta_basic" });
   const junta = await db.junta.findFirst({ where: { id: juntaId, comunidadId, status: "CONVOCADA" } });
   if (!junta) return;
   await db.juntaRsvp.upsert({
@@ -198,7 +199,7 @@ export async function delegateProxy(_prev: ActionState, formData: FormData): Pro
   const comunidadId = String(formData.get("comunidadId"));
   const juntaId = String(formData.get("juntaId"));
   const toMemberId = String(formData.get("toMemberId") ?? "");
-  const { member } = await requireMember(comunidadId);
+  const { member } = await requireMember(comunidadId, undefined, { feature: "junta_basic" });
   if (!member.unitId) return { error: "Asigna tu vivienda en Ajustes para poder delegar el voto." };
   if (!toMemberId || toMemberId === member.id) return { error: "Elige a otro vecino." };
 
@@ -235,7 +236,7 @@ export async function revokeProxy(formData: FormData) {
 // ─── Live junta (manager) ───────────────────────────────────────────────
 
 export async function startJunta(formData: FormData) {
-  const { comunidadId, junta, member } = await managerJunta(formData);
+  const { comunidadId, junta, member } = await managerJunta(formData, "voting");
   if (junta.status !== "CONVOCADA") return;
   const secondCall = formData.get("call") === "second";
   const president = await db.comunidadMember.findFirst({ where: { comunidadId, role: "PRESIDENT", status: "ACTIVE" } });
@@ -266,7 +267,7 @@ export async function startJunta(formData: FormData) {
 }
 
 export async function saveAttendance(formData: FormData) {
-  const { comunidadId, junta } = await managerJunta(formData);
+  const { comunidadId, junta } = await managerJunta(formData, "voting");
   if (junta.status !== "EN_CURSO") return;
   const units = await db.unit.findMany({ where: { comunidadId }, select: { id: true } });
   const ops = [];
@@ -290,7 +291,7 @@ export async function saveAttendance(formData: FormData) {
 }
 
 export async function setVoting(formData: FormData) {
-  const { comunidadId, junta } = await managerJunta(formData);
+  const { comunidadId, junta } = await managerJunta(formData, "voting");
   const itemId = String(formData.get("itemId"));
   const open = formData.get("open") === "true";
   if (junta.status !== "EN_CURSO") return;
@@ -315,7 +316,7 @@ export async function setVoting(formData: FormData) {
 
 /** Manager records votes for present units (e.g. show of hands in the room). */
 export async function recordVotes(formData: FormData) {
-  const { comunidadId, junta, member } = await managerJunta(formData);
+  const { comunidadId, junta, member } = await managerJunta(formData, "voting");
   const itemId = String(formData.get("itemId"));
   if (junta.status !== "EN_CURSO") return;
   const item = await db.agendaItem.findFirst({ where: { id: itemId, juntaId: junta.id, votingOpen: true } });
@@ -345,7 +346,7 @@ export async function recordVotes(formData: FormData) {
 }
 
 export async function setResolution(formData: FormData) {
-  const { comunidadId, junta } = await managerJunta(formData);
+  const { comunidadId, junta } = await managerJunta(formData, "actas");
   const itemId = String(formData.get("itemId"));
   const resolution = String(formData.get("resolution") ?? "").trim().slice(0, 4000);
   if (!["EN_CURSO", "CERRADA"].includes(junta.status)) return;
@@ -354,7 +355,7 @@ export async function setResolution(formData: FormData) {
 }
 
 export async function closeJunta(formData: FormData) {
-  const { comunidadId, junta } = await managerJunta(formData);
+  const { comunidadId, junta } = await managerJunta(formData, "voting");
   if (junta.status !== "EN_CURSO") return;
   const loaded = await loadJunta(comunidadId, junta.id);
   if (!loaded) return;
@@ -376,7 +377,7 @@ export async function closeJunta(formData: FormData) {
 }
 
 export async function saveActaNotes(formData: FormData) {
-  const { comunidadId, junta } = await managerJunta(formData);
+  const { comunidadId, junta } = await managerJunta(formData, "actas");
   if (junta.status !== "CERRADA") return;
   const actaNotes = String(formData.get("actaNotes") ?? "").trim().slice(0, 10_000);
   await db.junta.update({ where: { id: junta.id }, data: { actaNotes: actaNotes || null } });
@@ -384,7 +385,7 @@ export async function saveActaNotes(formData: FormData) {
 }
 
 export async function publishActa(formData: FormData) {
-  const { comunidadId, junta, comunidad } = await managerJunta(formData);
+  const { comunidadId, junta, comunidad } = await managerJunta(formData, "actas");
   if (junta.status !== "CERRADA") return;
   await db.junta.update({ where: { id: junta.id }, data: { actaPublishedAt: new Date() } });
   await notifyMembers({
@@ -408,7 +409,7 @@ export async function castVote(formData: FormData) {
   const unitId = String(formData.get("unitId"));
   const choice = String(formData.get("choice"));
   if (choice !== "YES" && choice !== "NO" && choice !== "ABSTAIN") return;
-  const { member } = await requireMember(comunidadId);
+  const { member } = await requireMember(comunidadId, undefined, { feature: "voting" });
 
   const loaded = await loadJunta(comunidadId, juntaId);
   if (!loaded || loaded.junta.status !== "EN_CURSO") return;

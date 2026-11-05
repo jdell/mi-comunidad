@@ -25,7 +25,7 @@ export async function createIncidencia(_prev: ActionState, formData: FormData): 
   const parsed = createSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return fieldErrors(parsed.error);
   const { comunidadId, ...data } = parsed.data;
-  const { member, comunidad } = await requireMember(comunidadId);
+  const { member, comunidad } = await requireMember(comunidadId, undefined, { feature: "incidencias" });
 
   const photos = filesFrom(formData, "photos").slice(0, 4);
   let photoPaths: string[] = [];
@@ -73,7 +73,7 @@ export async function updateIncidencia(_prev: ActionState, formData: FormData): 
   const parsed = updateSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return fieldErrors(parsed.error);
   const { comunidadId, incidenciaId, status, assignedTo, note } = parsed.data;
-  const { member, comunidad } = await requireMember(comunidadId);
+  const { member, comunidad } = await requireMember(comunidadId, undefined, { feature: "incidencias" });
 
   const incidencia = await db.incidencia.findFirst({ where: { id: incidenciaId, comunidadId } });
   if (!incidencia) return { error: "Incidencia no encontrada" };

@@ -27,7 +27,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { requireMember } from "@/lib/auth";
+import { UpgradeNotice } from "@/components/app/upgrade-notice";
+import { getEntitlements, requireMember } from "@/lib/auth";
+import { hasFeature } from "@/lib/entitlements";
 import { formatCents, formatDateTime } from "@/lib/format";
 import { computeJunta, JUNTA_STATUS_LABELS, JUNTA_TYPE_LABELS, loadJunta, morosoUnitIds, votableUnits } from "@/lib/juntas";
 import { formatPct, MAJORITY_LABELS, RESULT_LABELS, type VoteTally } from "@/lib/lph";
@@ -83,8 +85,9 @@ function TallyBar({ tally }: { tally: VoteTally }) {
 export default async function JuntaPage({ params, searchParams }: PageProps<"/c/[id]/juntas/[jid]">) {
   const { id, jid } = await params;
   const { error } = await searchParams;
-  const { member } = await requireMember(id);
+  const { member, comunidad } = await requireMember(id);
   const manager = isManager(member.role);
+  const canVote = hasFeature(await getEntitlements(comunidad), "voting");
   const loaded = await loadJunta(id, jid);
   if (!loaded || (loaded.junta.status === "DRAFT" && !manager)) notFound();
   const { junta, units } = loaded;
@@ -137,6 +140,9 @@ export default async function JuntaPage({ params, searchParams }: PageProps<"/c/
         }
       />
 
+      {manager && !canVote && junta.status === "CONVOCADA" && (
+        <UpgradeNotice comunidadId={id} feature="La votación en junta con quórum y acta automática" />
+      )}
       {typeof error === "string" && (
         <Alert variant="destructive" className="mb-4">
           <AlertDescription>{error}</AlertDescription>

@@ -61,3 +61,8 @@ New migrations: edit `prisma/schema.prisma`, then `npm run db:migrate -- --name 
   Overdue is computed (`PENDING` + past `dueDate`), not stored. Derramas split by coefficient with the
   largest-remainder method (`splitByCoefficient`) so cents always add up.
 - Daily cron `/api/cron/daily` (Vercel, `CRON_SECRET`) generates cuotas and sends reminders.
+- Billing: `Comunidad.plan` + `subscriptionStatus` mirror Stripe (webhook `/api/webhooks/stripe`, idempotent via
+  `StripeEvent`). What a comunidad can do is derived by `computeEntitlements` (`src/lib/entitlements.ts`):
+  14-day in-app trial of Comunidad features, Gratis afterwards, read-only when over the plan's unit limit.
+  Gate server actions with `requireMember(id, roles, { feature })` or `{ write: true }`.
+  Lifecycle changes are logged to `BillingEvent` (MRR analytics). Create Stripe prices with `scripts/stripe-setup.ts`.

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
+  BadgeEuro,
   Building2,
   CalendarDays,
   Wallet,
@@ -41,6 +42,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/vecinos", label: "Vecinos", icon: Users },
   { href: "/invitar", label: "Invitar vecinos", icon: UserPlus, roles: ["PRESIDENT", "SECRETARY"] },
   { href: "/unidades", label: "Viviendas", icon: Building2, roles: ["PRESIDENT", "SECRETARY", "TREASURER"] },
+  { href: "/plan", label: "Plan", icon: BadgeEuro, roles: ["PRESIDENT", "TREASURER"] },
   { href: "/ajustes", label: "Ajustes", icon: Settings },
 ];
 

@@ -6,7 +6,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { requireMember } from "@/lib/auth";
+import { UpgradeNotice } from "@/components/app/upgrade-notice";
+import { getEntitlements, requireMember } from "@/lib/auth";
+import { hasFeature } from "@/lib/entitlements";
 import { addMonths, CUOTA_STATUS_LABELS, displayStatus, isValidPeriod, periodLabel, periodOf, type CuotaDisplayStatus } from "@/lib/cuotas";
 import { db } from "@/lib/db";
 import { formatCents, formatDate } from "@/lib/format";
@@ -94,6 +96,7 @@ export default async function CuotasPage({ params, searchParams }: PageProps<"/c
   const paidCount = current.filter((c) => c.status === "PAID").length;
   const totalDebt = overdueAgg.reduce((a, c) => a + c.amountCents, 0);
   const morosoUnits = new Set(overdueAgg.map((c) => c.unitId)).size;
+  const entitlements = await getEntitlements(comunidad);
   const configured = comunidad.cuotaMode === "FIXED" ? comunidad.cuotaFixedCents > 0 : comunidad.cuotaAnnualBudgetCents > 0;
 
   return (
@@ -108,6 +111,7 @@ export default async function CuotasPage({ params, searchParams }: PageProps<"/c
           </>
         }
       />
+      {!hasFeature(entitlements, "cuotas") && <UpgradeNotice comunidadId={id} feature="La gestión de cuotas" />}
       {!configured && (
         <Alert className="mb-4 border-warning">
           <AlertDescription>

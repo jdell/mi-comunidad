@@ -34,7 +34,7 @@ export async function saveCuotaConfig(_prev: ActionState, formData: FormData): P
   const parsed = configSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return fieldErrors(parsed.error);
   const { comunidadId, cuotaMode, cuotaFixed, cuotaAnnualBudget, cuotaDueDay } = parsed.data;
-  await requireMember(comunidadId, FINANCE_ROLES);
+  await requireMember(comunidadId, FINANCE_ROLES, { feature: "cuotas" });
   await db.comunidad.update({
     where: { id: comunidadId },
     data: { cuotaMode, cuotaFixedCents: cuotaFixed, cuotaAnnualBudgetCents: cuotaAnnualBudget, cuotaDueDay },
@@ -46,7 +46,7 @@ export async function saveCuotaConfig(_prev: ActionState, formData: FormData): P
 export async function generateCuotas(formData: FormData) {
   const comunidadId = String(formData.get("comunidadId"));
   const period = String(formData.get("period"));
-  await requireMember(comunidadId, FINANCE_ROLES);
+  await requireMember(comunidadId, FINANCE_ROLES, { feature: "cuotas" });
   if (!isValidPeriod(period)) return;
   await generateMonthlyCuotas(comunidadId, period);
   revalidatePath(`/c/${comunidadId}/cuotas`);
@@ -55,7 +55,7 @@ export async function generateCuotas(formData: FormData) {
 export async function togglePaid(formData: FormData) {
   const comunidadId = String(formData.get("comunidadId"));
   const cuotaId = String(formData.get("cuotaId"));
-  await requireMember(comunidadId, FINANCE_ROLES);
+  await requireMember(comunidadId, FINANCE_ROLES, { feature: "cuotas" });
   const cuota = await db.cuota.findFirst({ where: { id: cuotaId, comunidadId } });
   if (!cuota) return;
   const paid = cuota.status === "PAID";
@@ -69,7 +69,7 @@ export async function togglePaid(formData: FormData) {
 
 export async function sendReminders(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const comunidadId = String(formData.get("comunidadId"));
-  await requireMember(comunidadId, FINANCE_ROLES);
+  await requireMember(comunidadId, FINANCE_ROLES, { feature: "reminders" });
   const { units, members } = await sendCuotaReminders(comunidadId, { cooldownDays: 1 });
   revalidatePath(`/c/${comunidadId}/cuotas`);
   if (units === 0) return { ok: true, message: "No hay recordatorios que enviar (o ya se enviaron en las últimas 24 h)." };
@@ -89,7 +89,7 @@ export async function createDerrama(_prev: ActionState, formData: FormData): Pro
   const parsed = derramaSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return fieldErrors(parsed.error);
   const { comunidadId, title, description, total, installments, firstPeriod } = parsed.data;
-  const { comunidad } = await requireMember(comunidadId, FINANCE_ROLES);
+  const { comunidad } = await requireMember(comunidadId, FINANCE_ROLES, { feature: "derramas" });
 
   const units = await db.unit.findMany({ where: { comunidadId }, orderBy: { createdAt: "asc" } });
   if (units.length === 0) return { error: "La comunidad no tiene viviendas." };
@@ -132,7 +132,7 @@ export async function createDerrama(_prev: ActionState, formData: FormData): Pro
 export async function deleteDerrama(formData: FormData) {
   const comunidadId = String(formData.get("comunidadId"));
   const derramaId = String(formData.get("derramaId"));
-  await requireMember(comunidadId, FINANCE_ROLES);
+  await requireMember(comunidadId, FINANCE_ROLES, { feature: "derramas" });
   const paid = await db.cuota.count({ where: { derramaId, comunidadId, status: "PAID" } });
   if (paid > 0) return;
   await db.derrama.deleteMany({ where: { id: derramaId, comunidadId } });

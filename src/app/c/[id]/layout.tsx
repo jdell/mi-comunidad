@@ -2,13 +2,15 @@ import Link from "next/link";
 import { LogoMark } from "@/components/logo";
 import { BottomNav, SideNav } from "@/components/app/app-nav";
 import { UserMenu } from "@/components/app/user-menu";
-import { requireMember } from "@/lib/auth";
+import { PlanBanner } from "@/components/app/plan-banner";
+import { getEntitlements, requireMember } from "@/lib/auth";
 import { ROLE_LABELS } from "@/lib/roles";
 
 export default async function ComunidadLayout({ children, params }: LayoutProps<"/c/[id]">) {
   const { id } = await params;
   const { user, member, comunidad } = await requireMember(id);
   const base = `/c/${id}`;
+  const entitlements = await getEntitlements(comunidad);
 
   return (
     <div className="flex min-h-dvh">
@@ -39,6 +41,7 @@ export default async function ComunidadLayout({ children, params }: LayoutProps<
           <div className="hidden md:block" />
           <UserMenu name={member.displayName || user.name || "Mi cuenta"} />
         </header>
+        <PlanBanner comunidadId={id} entitlements={entitlements} unitsCount={comunidad.unitsCount} canManage={member.role === "PRESIDENT"} />
         <main className="mx-auto w-full max-w-5xl flex-1 p-4 pb-24 md:p-8 md:pb-8">{children}</main>
       </div>
       <BottomNav base={base} role={member.role} />
