@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, LogOut, Monitor, Moon, Sun, UserRound } from "lucide-react";
+import { Building2, LogOut, Monitor, Moon, Shield, Sun, UserRound } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { initials } from "@/lib/format";
 
-export function UserMenu({ name }: { name: string }) {
+export function UserMenu({ name, isAdmin = false }: { name: string; isAdmin?: boolean }) {
   const { theme, setTheme } = useTheme();
   return (
     <DropdownMenu>
@@ -43,6 +43,13 @@ export function UserMenu({ name }: { name: string }) {
             <UserRound /> Mi cuenta
           </Link>
         </DropdownMenuItem>
+        {isAdmin && (
+          <DropdownMenuItem asChild>
+            <Link href="/admin">
+              <Shield /> Administración
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs text-muted-foreground">Apariencia</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={theme ?? "system"} onValueChange={setTheme}>

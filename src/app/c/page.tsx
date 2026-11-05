@@ -7,6 +7,7 @@ import { UserMenu } from "@/components/app/user-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { isPlatformAdminEmail } from "@/lib/admin";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ROLE_LABELS } from "@/lib/roles";
@@ -29,7 +30,7 @@ export default async function ComunidadesPage() {
     <div className="min-h-dvh">
       <header className="flex items-center justify-between border-b px-4 py-3">
         <Logo href="/c" />
-        <UserMenu name={user.name ?? user.email ?? user.phone ?? "Mi cuenta"} />
+        <UserMenu name={user.name ?? user.email ?? user.phone ?? "Mi cuenta"} isAdmin={isPlatformAdminEmail(user.email)} />
       </header>
       <main className="mx-auto max-w-2xl space-y-4 p-4">
         <div className="flex items-center justify-between pt-4">

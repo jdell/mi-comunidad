@@ -44,6 +44,7 @@ npm test             # vitest (domain logic: LPH rules, cuotas)
 npm run build        # production build
 npm run db:migrate   # create/apply migrations (uses DIRECT_URL)
 npm run db:deploy    # apply migrations in prod
+npm run db:seed      # demo data (idempotent): "C. P. Gran Vía 42" + extra comunidades
 ```
 
 New migrations: edit `prisma/schema.prisma`, then `npm run db:migrate -- --name <name>` against a dev DB.
@@ -66,3 +67,5 @@ New migrations: edit `prisma/schema.prisma`, then `npm run db:migrate -- --name 
   14-day in-app trial of Comunidad features, Gratis afterwards, read-only when over the plan's unit limit.
   Gate server actions with `requireMember(id, roles, { feature })` or `{ write: true }`.
   Lifecycle changes are logged to `BillingEvent` (MRR analytics). Create Stripe prices with `scripts/stripe-setup.ts`.
+- Platform admin at `/admin`: guarded by `requireAdmin()` (`src/lib/admin.ts`) against `ADMIN_EMAILS`
+  (empty = nobody, fail closed; non-admins get a 404). Revenue maths in `src/lib/revenue.ts` (unit-tested).

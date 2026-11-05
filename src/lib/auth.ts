@@ -34,15 +34,20 @@ export const getCurrentUser = cache(async () => {
   const existing = await db.user.findUnique({ where: { id: authUser.id } });
   if (existing) {
     if ((email && existing.email !== email) || (phone && existing.phone !== phone)) {
-      return db.user.update({
-        where: { id: authUser.id },
-        data: { email: email ?? existing.email, phone: phone ?? existing.phone },
-      });
+      // Best effort: a stale row may still hold that email/phone (unique). Never block sign-in on it.
+      return db.user
+        .update({ where: { id: authUser.id }, data: { email: email ?? existing.email, phone: phone ?? existing.phone } })
+        .catch(() => existing);
     }
     return existing;
   }
 
-  return db.user.create({ data: { id: authUser.id, email, phone, name } });
+  try {
+    return await db.user.create({ data: { id: authUser.id, email, phone, name } });
+  } catch {
+    // Contact already attached to another (stale) row: create without it.
+    return db.user.upsert({ where: { id: authUser.id }, create: { id: authUser.id, name }, update: {} });
+  }
 });
 
 export async function requireUser(next?: string) {

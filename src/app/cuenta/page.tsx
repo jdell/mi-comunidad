@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Logo } from "@/components/logo";
 import { UserMenu } from "@/components/app/user-menu";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { isPlatformAdminEmail } from "@/lib/admin";
 import { requireUser } from "@/lib/auth";
 import { AccountForm } from "./account-form";
 
@@ -13,7 +14,7 @@ export default async function AccountPage() {
     <div className="min-h-dvh">
       <header className="flex items-center justify-between border-b px-4 py-3">
         <Logo href="/c" />
-        <UserMenu name={user.name ?? user.email ?? user.phone ?? "Mi cuenta"} />
+        <UserMenu name={user.name ?? user.email ?? user.phone ?? "Mi cuenta"} isAdmin={isPlatformAdminEmail(user.email)} />
       </header>
       <main className="mx-auto max-w-2xl space-y-4 p-4 py-8">
         <h1 className="text-2xl font-semibold">Mi cuenta</h1>
