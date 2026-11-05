@@ -40,3 +40,6 @@ yarn-error.log*
 # Prisma
 prisma/*.db
 prisma/*.db-journal
+
+# Generated
+/src/generated
