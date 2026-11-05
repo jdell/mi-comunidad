@@ -7,12 +7,17 @@ import { requireMember } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatCents, formatDateTime, formatRelative } from "@/lib/format";
 import { JUNTA_TYPE_LABELS, nextJunta } from "@/lib/juntas";
+import { shouldAskNps } from "@/lib/nps";
+import { onboardingSteps } from "@/lib/onboarding";
 import { isFinance, isManager } from "@/lib/roles";
+import { NpsPrompt } from "@/components/app/nps-prompt";
+import { OnboardingChecklist } from "@/components/app/onboarding-checklist";
+import { dismissNps, dismissOnboarding, submitNps } from "./actions";
 import { IncidenciaStatusBadge } from "./incidencias/status-badge";
 
 export default async function ComunidadHome({ params }: PageProps<"/c/[id]">) {
   const { id } = await params;
-  const { member, comunidad } = await requireMember(id);
+  const { user, member, comunidad } = await requireMember(id);
   const manager = isManager(member.role);
 
   const now = new Date();
@@ -44,6 +49,9 @@ export default async function ComunidadHome({ params }: PageProps<"/c/[id]">) {
     }),
   ]);
   const overdueCents = overdue.reduce((a, c) => a + c.amountCents, 0);
+  const steps = member.role === "PRESIDENT" && !comunidad.onboardingDismissedAt ? await onboardingSteps(id) : null;
+  const showChecklist = steps && steps.some((s) => !s.done);
+  const askNps = !showChecklist && (await shouldAskNps(user.id, member.joinedAt));
 
   const quickActions = [
     manager && { href: `/c/${id}/anuncios/nuevo`, label: "Nuevo anuncio", icon: Megaphone },
@@ -55,6 +63,9 @@ export default async function ComunidadHome({ params }: PageProps<"/c/[id]">) {
   return (
     <>
       <PageHeader title={`Hola, ${member.displayName.split(" ")[0]}`} description={`${comunidad.name} · ${comunidad.address}`} />
+
+      {showChecklist && <OnboardingChecklist comunidadId={id} steps={steps} dismissAction={dismissOnboarding} />}
+      {askNps && <NpsPrompt comunidadId={id} submitAction={submitNps} dismissAction={dismissNps} />}
 
       <div className="grid grid-cols-3 gap-3">
         <StatCard label="vecinos activos" value={members} hint={manager && pending ? `${pending} pendientes de aprobar` : undefined} />

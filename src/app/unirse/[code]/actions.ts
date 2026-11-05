@@ -11,6 +11,7 @@ const schema = z.object({
   code: z.string().min(1),
   displayName: z.string().trim().min(2, "Indica tu nombre").max(80),
   unitId: z.string().optional(),
+  notifyWhatsApp: z.preprocess((v) => v === "on", z.boolean()),
 });
 
 export async function joinComunidad(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -56,8 +57,16 @@ export async function joinComunidad(_prev: ActionState, formData: FormData): Pro
         displayName,
         email: user.email,
         phone: user.phone,
+        notifyWhatsApp: parsed.data.notifyWhatsApp && Boolean(user.phone),
       },
-      update: { unitId, role: invitation?.role ?? "VECINO", status, displayName, joinedAt: new Date() },
+      update: {
+        unitId,
+        role: invitation?.role ?? "VECINO",
+        status,
+        displayName,
+        joinedAt: new Date(),
+        notifyWhatsApp: parsed.data.notifyWhatsApp && Boolean(user.phone),
+      },
     });
     if (invitation) {
       await tx.invitation.update({

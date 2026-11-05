@@ -12,7 +12,7 @@ export function ProfileForm({
   units,
 }: {
   comunidadId: string;
-  member: { displayName: string; phone: string | null; email: string | null; unitId: string | null; notifyEmail: boolean };
+  member: { displayName: string; phone: string | null; email: string | null; unitId: string | null; notifyEmail: boolean; notifyWhatsApp: boolean };
   units: { id: string; label: string }[];
 }) {
   const [state, action] = useActionState(updateMyProfile, {});
@@ -47,6 +47,13 @@ export function ProfileForm({
           <input type="checkbox" name="notifyEmail" defaultChecked={member.notifyEmail} className="accent-primary" />
           Recibir anuncios, incidencias y juntas por email
         </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="notifyWhatsApp" defaultChecked={member.notifyWhatsApp} className="accent-primary" />
+          Recibir avisos por WhatsApp (necesita teléfono)
+        </label>
+        <p className="text-xs text-muted-foreground">
+          Las convocatorias de junta y los avisos de deuda se envían siempre también por email, para que quede constancia.
+        </p>
       </fieldset>
       <SubmitButton>Guardar perfil</SubmitButton>
     </form>

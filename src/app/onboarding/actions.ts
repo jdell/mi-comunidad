@@ -67,6 +67,7 @@ export async function createComunidad(_prev: ActionState, formData: FormData): P
         displayName: data.presidentName,
         email: user.email,
         phone: user.phone,
+        notifyWhatsApp: Boolean(user.phone),
       },
     });
     if (!user.name) await tx.user.update({ where: { id: user.id }, data: { name: data.presidentName } });

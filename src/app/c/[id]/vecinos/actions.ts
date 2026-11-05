@@ -68,7 +68,7 @@ export async function transferPresidency(_prev: ActionState, formData: FormData)
 
   await notifyMembers({
     comunidadId,
-    event: "announcement",
+    event: "membership",
     memberIds: [target.id, member.id],
     subject: `Cambio de presidencia en ${comunidad.name}`,
     title: "Cambio de presidencia",

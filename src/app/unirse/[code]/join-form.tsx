@@ -47,6 +47,10 @@ export function JoinForm({
             </NativeSelect>
             {lockedUnitId && <input type="hidden" name="unitId" value={lockedUnitId} />}
           </Field>
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" name="notifyWhatsApp" defaultChecked className="mt-0.5 accent-primary" />
+            <span>Quiero recibir los avisos de la comunidad por WhatsApp. Puedes cambiarlo cuando quieras.</span>
+          </label>
           <SubmitButton className="h-11 w-full">Unirme a la comunidad</SubmitButton>
           {requiresApproval && (
             <p className="text-center text-sm text-muted-foreground">

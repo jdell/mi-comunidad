@@ -50,6 +50,11 @@ enum BillingEventType {
   CANCELED
 }
 
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+}
+
 enum ApprovalMode {
   AUTOMATIC
   MANUAL
@@ -153,16 +158,21 @@ enum DocumentCategory {
 
 /// Mirrors a Supabase auth user. `id` is the Supabase auth.users UUID.
 model User {
-  id        String   @id @db.Uuid
-  email     String?  @unique
-  phone     String?  @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String    @id @db.Uuid
+  email         String?   @unique
+  phone         String?   @unique
+  name          String?
+  /// Product/lifecycle emails (onboarding tips, win-back). Transactional notices are always sent.
+  productEmails Boolean   @default(true)
+  /// Set when the user exercised the right to erasure (data anonymised).
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   memberships         ComunidadMember[]
   invitationsSent     Invitation[]      @relation("InvitationCreatedBy")
   invitationsAccepted Invitation[]      @relation("InvitationAcceptedBy")
+  npsResponses        NpsResponse[]
 }
 
 model Comunidad {
@@ -194,6 +204,12 @@ model Comunidad {
   currentPeriodEnd     DateTime?
   cancelAtPeriodEnd    Boolean            @default(false)
 
+  /// Engagement bookkeeping.
+  onboardingDismissedAt DateTime?
+  trialReminderSentAt   DateTime?
+  activationNudgeSentAt DateTime?
+  winbackSentAt         DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -207,6 +223,8 @@ model Comunidad {
   cuotas        Cuota[]
   derramas      Derrama[]
   billingEvents BillingEvent[]
+  notifications NotificationLog[]
+  npsResponses  NpsResponse[]
 }
 
 /// A flat, local, garage or storage room with its ownership coefficient (LPH art. 5).
@@ -233,19 +251,21 @@ model Unit {
 }
 
 model ComunidadMember {
-  id          String       @id @default(cuid())
-  comunidadId String
-  userId      String       @db.Uuid
-  unitId      String?
-  role        MemberRole   @default(VECINO)
-  status      MemberStatus @default(ACTIVE)
-  displayName String
-  phone       String?
-  email       String?
+  id             String       @id @default(cuid())
+  comunidadId    String
+  userId         String       @db.Uuid
+  unitId         String?
+  role           MemberRole   @default(VECINO)
+  status         MemberStatus @default(ACTIVE)
+  displayName    String
+  phone          String?
+  email          String?
   /// Notification preference: receive notifications by email.
-  notifyEmail Boolean      @default(true)
-  joinedAt    DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  notifyEmail    Boolean      @default(true)
+  /// Opt-in to WhatsApp notifications (requires `phone`).
+  notifyWhatsApp Boolean      @default(false)
+  joinedAt       DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   comunidad Comunidad @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -261,6 +281,7 @@ model ComunidadMember {
   rsvps             JuntaRsvp[]
   proxiesGiven      ProxyDelegation[]  @relation("ProxyFrom")
   proxiesReceived   ProxyDelegation[]  @relation("ProxyTo")
+  notificationLogs  NotificationLog[]
 
   @@unique([comunidadId, userId])
   @@index([userId])
@@ -563,4 +584,38 @@ model BillingEvent {
 
   @@index([occurredAt])
   @@index([comunidadId, occurredAt])
+}
+
+/// Delivery log per member and channel (LPH: evidence that notices were sent).
+model NotificationLog {
+  id          String              @id @default(cuid())
+  comunidadId String
+  memberId    String?
+  channel     NotificationChannel
+  event       String
+  success     Boolean
+  error       String?
+  createdAt   DateTime            @default(now())
+
+  comunidad Comunidad        @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  member    ComunidadMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  @@index([comunidadId, createdAt])
+  @@index([memberId])
+}
+
+/// Net Promoter Score responses. `score` null = prompt dismissed.
+model NpsResponse {
+  id          String   @id @default(cuid())
+  userId      String   @db.Uuid
+  comunidadId String?
+  score       Int?
+  comment     String?
+  createdAt   DateTime @default(now())
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comunidad Comunidad? @relation(fields: [comunidadId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }

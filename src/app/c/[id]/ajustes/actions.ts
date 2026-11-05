@@ -18,12 +18,13 @@ const profileSchema = z.object({
   email: z.union([z.literal(""), z.email("Email no válido")]).optional(),
   unitId: z.string().optional(),
   notifyEmail: z.preprocess((v) => v === "on", z.boolean()),
+  notifyWhatsApp: z.preprocess((v) => v === "on", z.boolean()),
 });
 
 export async function updateMyProfile(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = profileSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return fieldErrors(parsed.error);
-  const { comunidadId, displayName, phone, email, unitId, notifyEmail } = parsed.data;
+  const { comunidadId, displayName, phone, email, unitId, notifyEmail, notifyWhatsApp } = parsed.data;
   const { member } = await requireMember(comunidadId);
 
   if (unitId && unitId !== member.unitId) {
@@ -37,7 +38,7 @@ export async function updateMyProfile(_prev: ActionState, formData: FormData): P
 
   await db.comunidadMember.update({
     where: { id: member.id },
-    data: { displayName, phone: phone ? toE164(phone) : null, email: email || null, unitId: unitId || null, notifyEmail },
+    data: { displayName, phone: phone ? toE164(phone) : null, email: email || null, unitId: unitId || null, notifyEmail, notifyWhatsApp: notifyWhatsApp && Boolean(phone) },
   });
   revalidatePath(`/c/${comunidadId}`, "layout");
   return { ok: true, message: "Perfil actualizado" };

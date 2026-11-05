@@ -103,7 +103,7 @@ export async function handleInvoicePaymentFailed(invoice: Stripe.Invoice, stripe
 
   await notifyMembers({
     comunidadId: comunidad.id,
-    event: "announcement",
+    event: "billing",
     roles: ["PRESIDENT"],
     subject: `No hemos podido cobrar la suscripción de ${comunidad.name}`,
     title: "Problema con el pago",

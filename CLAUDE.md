@@ -69,3 +69,9 @@ New migrations: edit `prisma/schema.prisma`, then `npm run db:migrate -- --name 
   Lifecycle changes are logged to `BillingEvent` (MRR analytics). Create Stripe prices with `scripts/stripe-setup.ts`.
 - Platform admin at `/admin`: guarded by `requireAdmin()` (`src/lib/admin.ts`) against `ADMIN_EMAILS`
   (empty = nobody, fail closed; non-admins get a 404). Revenue maths in `src/lib/revenue.ts` (unit-tested).
+- Notifications go through `notifyMembers` (`src/lib/notifications.ts`): WhatsApp (Meta Cloud API template, opt-in per
+  member) and/or email (Resend), logged in `NotificationLog`. Legal notices (convocatorias, debt reminders, actas,
+  billing) always also go by email. Lifecycle emails to presidents live in `src/lib/retention.ts` and respect
+  `User.productEmails`.
+- GDPR: `/cuenta` offers data export (`/cuenta/exportar`) and erasure (anonymisation; presidents must hand over first).
+  Legal identity for `/privacidad` and `/terminos` comes from `src/lib/legal.ts` (fill in before launch).

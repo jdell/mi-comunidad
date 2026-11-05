@@ -390,7 +390,7 @@ export async function publishActa(formData: FormData) {
   await db.junta.update({ where: { id: junta.id }, data: { actaPublishedAt: new Date() } });
   await notifyMembers({
     comunidadId,
-    event: "announcement",
+    event: "acta_published",
     subject: `Acta de la junta del ${formatDateTime(junta.scheduledAt)} — ${comunidad.name}`,
     title: "Acta de la junta disponible",
     html: `<p>Ya está disponible el acta de la junta celebrada el ${escapeHtml(formatDateTime(junta.scheduledAt))}. Según la LPH (art. 17.8), los propietarios ausentes disponen de 30 días naturales para manifestar su discrepancia con los acuerdos.</p>`,

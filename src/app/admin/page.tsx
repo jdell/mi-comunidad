@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { computeEntitlements } from "@/lib/entitlements";
 import { formatCents, formatRelative } from "@/lib/format";
 import { PLANS } from "@/lib/plans";
+import { npsScore } from "@/lib/nps";
 import { ACTIVE_STATUSES, mrrOf } from "@/lib/revenue";
 
 export const metadata = { title: "Resumen" };
@@ -16,7 +17,7 @@ const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000);
 export default async function AdminDashboard() {
   await requireAdmin();
   const since30 = daysAgo(30);
-  const [comunidades, vecinos, activeSubs, signups30, recent, billing] = await Promise.all([
+  const [comunidades, vecinos, activeSubs, signups30, recent, billing, npsRows, notifications30] = await Promise.all([
     db.comunidad.count(),
     db.comunidadMember.count({ where: { status: "ACTIVE" } }),
     db.comunidad.count({ where: { plan: { not: "GRATIS" }, subscriptionStatus: { in: [...ACTIVE_STATUSES] } } }),
@@ -30,7 +31,11 @@ export default async function AdminDashboard() {
       },
     }),
     db.comunidad.findMany({ select: { plan: true, subscriptionStatus: true, trialEndsAt: true, createdAt: true, unitsCount: true } }),
+    db.npsResponse.findMany({ where: { score: { not: null }, createdAt: { gte: daysAgo(180) } }, select: { score: true } }),
+    db.notificationLog.groupBy({ by: ["channel"], where: { createdAt: { gte: since30 } }, _count: true }),
   ]);
+  const nps = npsScore(npsRows.map((r) => r.score!));
+  const sent = (channel: "EMAIL" | "WHATSAPP") => notifications30.find((n) => n.channel === channel)?._count ?? 0;
   const mrr = billing.reduce((a, c) => a + mrrOf(c), 0);
   const trials = billing.filter((c) => computeEntitlements(c).trialActive).length;
 
@@ -42,6 +47,9 @@ export default async function AdminDashboard() {
         <StatCard label="vecinos activos" value={vecinos} />
         <StatCard label="suscripciones activas" value={activeSubs} hint={`${trials} en prueba`} />
         <StatCard label="MRR" value={formatCents(mrr, { round: true })} hint={`ARR ${formatCents(mrr * 12, { round: true })}`} />
+        <StatCard label="NPS (180 días)" value={nps === null ? "—" : nps} hint={`${npsRows.length} respuestas · objetivo > 40`} />
+        <StatCard label="avisos por WhatsApp (30 días)" value={sent("WHATSAPP")} />
+        <StatCard label="emails enviados (30 días)" value={sent("EMAIL")} />
       </div>
       <Card className="mt-6">
         <CardHeader className="flex flex-row items-center justify-between">
