@@ -58,6 +58,62 @@ enum IncidenciaLocation {
   OTRO
 }
 
+enum JuntaType {
+  ORDINARIA
+  EXTRAORDINARIA
+}
+
+enum JuntaStatus {
+  DRAFT
+  CONVOCADA
+  EN_CURSO
+  CERRADA
+  CANCELADA
+}
+
+/// LPH art. 17 majority rules.
+enum MajorityType {
+  SIMPLE
+  THREE_FIFTHS
+  UNANIMITY
+  INFORMATIVE
+}
+
+enum AgendaItemResult {
+  APPROVED
+  REJECTED
+  /// Unanimity reached among attendees; absent owners have 30 days to object (LPH art. 17.8).
+  PROVISIONAL
+  NO_VOTE
+}
+
+enum VoteChoice {
+  YES
+  NO
+  ABSTAIN
+}
+
+enum AttendanceType {
+  IN_PERSON
+  REMOTE
+  PROXY
+}
+
+enum CuotaMode {
+  FIXED
+  COEFFICIENT
+}
+
+enum CuotaKind {
+  ORDINARIA
+  DERRAMA
+}
+
+enum CuotaStatus {
+  PENDING
+  PAID
+}
+
 enum DocumentCategory {
   ACTA
   ESTATUTOS
@@ -93,8 +149,17 @@ model Comunidad {
   unitsCount   Int
   inviteCode   String       @unique
   approvalMode ApprovalMode @default(AUTOMATIC)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+
+  /// Monthly cuota configuration (amounts in EUR cents).
+  cuotaMode              CuotaMode @default(FIXED)
+  cuotaFixedCents        Int       @default(0)
+  /// Annual budget split by coefficient when cuotaMode = COEFFICIENT.
+  cuotaAnnualBudgetCents Int       @default(0)
+  /// Day of month cuotas are due (1-28).
+  cuotaDueDay            Int       @default(10)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   units         Unit[]
   members       ComunidadMember[]
@@ -102,6 +167,9 @@ model Comunidad {
   announcements Announcement[]
   incidencias   Incidencia[]
   documents     Document[]
+  juntas        Junta[]
+  cuotas        Cuota[]
+  derramas      Derrama[]
 }
 
 /// A flat, local, garage or storage room with its ownership coefficient (LPH art. 5).
@@ -118,6 +186,10 @@ model Unit {
   comunidad   Comunidad         @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
   members     ComunidadMember[]
   invitations Invitation[]
+  votes       Vote[]
+  attendances JuntaAttendance[]
+  proxies     ProxyDelegation[]
+  cuotas      Cuota[]
 
   @@unique([comunidadId, label])
   @@index([comunidadId])
@@ -147,6 +219,11 @@ model ComunidadMember {
   incidencias       Incidencia[]
   incidenciaUpdates IncidenciaUpdate[]
   documents         Document[]
+  juntasCreated     Junta[]
+  votesCast         Vote[]
+  rsvps             JuntaRsvp[]
+  proxiesGiven      ProxyDelegation[]  @relation("ProxyFrom")
+  proxiesReceived   ProxyDelegation[]  @relation("ProxyTo")
 
   @@unique([comunidadId, userId])
   @@index([userId])
@@ -265,4 +342,163 @@ model Document {
   uploadedBy ComunidadMember @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
 
   @@index([comunidadId, year])
+}
+
+model Junta {
+  id               String      @id @default(cuid())
+  comunidadId      String
+  createdById      String
+  type             JuntaType   @default(ORDINARIA)
+  status           JuntaStatus @default(DRAFT)
+  /// First call (primera convocatoria).
+  scheduledAt      DateTime
+  /// Second call (segunda convocatoria), usually 30 minutes later.
+  secondCallAt     DateTime?
+  location         String
+  notes            String?
+  convocadaAt      DateTime?
+  recipientsCount  Int         @default(0)
+  reminderSentAt   DateTime?
+  startedAt        DateTime?
+  /// Held on second call (affects quorum and simple majority, LPH arts. 16-17).
+  heldOnSecondCall Boolean     @default(false)
+  presidentName    String?
+  secretaryName    String?
+  closedAt         DateTime?
+  actaNotes        String?
+  actaPublishedAt  DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  comunidad   Comunidad         @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  createdBy   ComunidadMember   @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  agendaItems AgendaItem[]
+  attendances JuntaAttendance[]
+  proxies     ProxyDelegation[]
+  rsvps       JuntaRsvp[]
+
+  @@index([comunidadId, scheduledAt])
+}
+
+model AgendaItem {
+  id          String            @id @default(cuid())
+  juntaId     String
+  order       Int
+  title       String
+  description String?
+  majority    MajorityType      @default(SIMPLE)
+  votingOpen  Boolean           @default(false)
+  votingDone  Boolean           @default(false)
+  result      AgendaItemResult?
+  /// Agreement text recorded in the acta.
+  resolution  String?
+
+  junta Junta  @relation(fields: [juntaId], references: [id], onDelete: Cascade)
+  votes Vote[]
+
+  @@index([juntaId, order])
+}
+
+/// One vote per unit and agenda item, weighted by the unit coefficient.
+model Vote {
+  id             String     @id @default(cuid())
+  agendaItemId   String
+  unitId         String
+  choice         VoteChoice
+  castByMemberId String?
+  castAt         DateTime   @default(now())
+
+  agendaItem AgendaItem       @relation(fields: [agendaItemId], references: [id], onDelete: Cascade)
+  unit       Unit             @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  castBy     ComunidadMember? @relation(fields: [castByMemberId], references: [id], onDelete: SetNull)
+
+  @@unique([agendaItemId, unitId])
+}
+
+model JuntaAttendance {
+  id                 String         @id @default(cuid())
+  juntaId            String
+  unitId             String
+  type               AttendanceType
+  representativeName String?
+  createdAt          DateTime       @default(now())
+
+  junta Junta @relation(fields: [juntaId], references: [id], onDelete: Cascade)
+  unit  Unit  @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([juntaId, unitId])
+}
+
+/// A unit owner delegates their vote to another member (LPH art. 15.1).
+model ProxyDelegation {
+  id           String   @id @default(cuid())
+  juntaId      String
+  unitId       String
+  fromMemberId String
+  toMemberId   String
+  createdAt    DateTime @default(now())
+
+  junta      Junta           @relation(fields: [juntaId], references: [id], onDelete: Cascade)
+  unit       Unit            @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  fromMember ComunidadMember @relation("ProxyFrom", fields: [fromMemberId], references: [id], onDelete: Cascade)
+  toMember   ComunidadMember @relation("ProxyTo", fields: [toMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([juntaId, unitId])
+}
+
+model JuntaRsvp {
+  id        String   @id @default(cuid())
+  juntaId   String
+  memberId  String
+  attending Boolean
+  updatedAt DateTime @updatedAt
+
+  junta  Junta           @relation(fields: [juntaId], references: [id], onDelete: Cascade)
+  member ComunidadMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([juntaId, memberId])
+}
+
+/// A charge to a unit: a monthly ordinary cuota or a derrama installment.
+model Cuota {
+  id             String      @id @default(cuid())
+  /// Idempotency key: "{unitId}:{kind}:{period}:{derramaId|-}:{installment}" (see src/lib/cuotas.ts).
+  key            String      @unique
+  comunidadId    String
+  unitId         String
+  kind           CuotaKind   @default(ORDINARIA)
+  /// Billing month "YYYY-MM" (for derramas: the installment's month).
+  period         String
+  derramaId      String?
+  installment    Int         @default(1)
+  amountCents    Int
+  dueDate        DateTime
+  status         CuotaStatus @default(PENDING)
+  paidAt         DateTime?
+  lastReminderAt DateTime?
+  remindersCount Int         @default(0)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  comunidad Comunidad @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  unit      Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  derrama   Derrama?  @relation(fields: [derramaId], references: [id], onDelete: Cascade)
+
+  @@index([comunidadId, period])
+  @@index([comunidadId, status, dueDate])
+}
+
+/// Extraordinary levy, split across units by ownership coefficient.
+model Derrama {
+  id           String   @id @default(cuid())
+  comunidadId  String
+  title        String
+  description  String?
+  totalCents   Int
+  installments Int      @default(1)
+  firstDueDate DateTime
+  createdAt    DateTime @default(now())
+
+  comunidad Comunidad @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  cuotas    Cuota[]
 }

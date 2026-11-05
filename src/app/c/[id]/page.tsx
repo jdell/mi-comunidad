@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireMember } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { formatRelative } from "@/lib/format";
-import { isManager } from "@/lib/roles";
+import { formatCents, formatDateTime, formatRelative } from "@/lib/format";
+import { JUNTA_TYPE_LABELS, nextJunta } from "@/lib/juntas";
+import { isFinance, isManager } from "@/lib/roles";
 import { IncidenciaStatusBadge } from "./incidencias/status-badge";
 
 export default async function ComunidadHome({ params }: PageProps<"/c/[id]">) {
@@ -14,7 +15,8 @@ export default async function ComunidadHome({ params }: PageProps<"/c/[id]">) {
   const { member, comunidad } = await requireMember(id);
   const manager = isManager(member.role);
 
-  const [members, pending, openIncidencias, documents, announcements, incidencias] = await Promise.all([
+  const now = new Date();
+  const [members, pending, openIncidencias, documents, announcements, incidencias, junta, overdue] = await Promise.all([
     db.comunidadMember.count({ where: { comunidadId: id, status: "ACTIVE" } }),
     db.comunidadMember.count({ where: { comunidadId: id, status: "PENDING" } }),
     db.incidencia.count({ where: { comunidadId: id, status: { not: "RESOLVED" } } }),
@@ -30,11 +32,23 @@ export default async function ComunidadHome({ params }: PageProps<"/c/[id]">) {
       orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
       take: 3,
     }),
+    nextJunta(id),
+    db.cuota.findMany({
+      where: {
+        comunidadId: id,
+        status: "PENDING",
+        dueDate: { lt: now },
+        ...(isFinance(member.role) ? {} : { unitId: member.unitId ?? "__none__" }),
+      },
+      select: { amountCents: true, unitId: true },
+    }),
   ]);
+  const overdueCents = overdue.reduce((a, c) => a + c.amountCents, 0);
 
   const quickActions = [
     manager && { href: `/c/${id}/anuncios/nuevo`, label: "Nuevo anuncio", icon: Megaphone },
     { href: `/c/${id}/incidencias/nueva`, label: "Reportar incidencia", icon: Wrench },
+    manager && { href: `/c/${id}/juntas/nueva`, label: "Convocar junta", icon: CalendarDays },
     manager && { href: `/c/${id}/invitar`, label: "Invitar vecinos", icon: UserPlus },
   ].filter(Boolean) as { href: string; label: string; icon: typeof Megaphone }[];
 
@@ -45,12 +59,18 @@ export default async function ComunidadHome({ params }: PageProps<"/c/[id]">) {
       <div className="grid grid-cols-3 gap-3">
         <StatCard label="vecinos activos" value={members} hint={manager && pending ? `${pending} pendientes de aprobar` : undefined} />
         <StatCard label="incidencias abiertas" value={openIncidencias} />
-        <StatCard label="documentos" value={documents} />
+        {isFinance(member.role) ? (
+          <StatCard label="deuda vencida" value={formatCents(overdueCents, { round: true })} hint={`${new Set(overdue.map((o) => o.unitId)).size} viviendas`} />
+        ) : member.unitId ? (
+          <StatCard label="tus cuotas" value={overdueCents > 0 ? formatCents(overdueCents) : "Al día"} hint={overdueCents > 0 ? "pendiente de pago" : undefined} />
+        ) : (
+          <StatCard label="documentos" value={documents} />
+        )}
       </div>
 
       <section className="mt-6">
         <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">Acciones rápidas</h2>
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {quickActions.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} className="flex items-center gap-3 rounded-xl border bg-card p-3 transition-colors hover:border-primary">
               <span className="rounded-lg bg-primary/10 p-2 text-primary">
@@ -110,7 +130,20 @@ export default async function ComunidadHome({ params }: PageProps<"/c/[id]">) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">No hay ninguna junta convocada.</p>
+            {junta ? (
+              <Link href={`/c/${id}/juntas/${junta.id}`} className="block space-y-1 hover:text-primary">
+                <p className="font-medium">
+                  Junta {JUNTA_TYPE_LABELS[junta.type].toLowerCase()} · {formatDateTime(junta.scheduledAt)}
+                  {junta.status === "EN_CURSO" && <span className="ml-2 text-primary">● en curso</span>}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {junta.location} · Orden del día: {junta.agendaItems.map((a) => a.title).slice(0, 3).join("; ")}
+                  {junta.agendaItems.length > 3 ? "…" : ""}
+                </p>
+              </Link>
+            ) : (
+              <p className="text-sm text-muted-foreground">No hay ninguna junta convocada.</p>
+            )}
           </CardContent>
         </Card>
       </div>

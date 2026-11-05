@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Building2,
+  CalendarDays,
+  Wallet,
   FileText,
   Home,
   Megaphone,
@@ -33,7 +35,9 @@ const NAV_ITEMS: NavItem[] = [
   { href: "", label: "Inicio", icon: Home, primary: true },
   { href: "/anuncios", label: "Anuncios", icon: Megaphone, primary: true },
   { href: "/incidencias", label: "Incidencias", icon: Wrench, primary: true },
-  { href: "/documentos", label: "Documentos", icon: FileText, primary: true },
+  { href: "/juntas", label: "Juntas", icon: CalendarDays, primary: true },
+  { href: "/documentos", label: "Documentos", icon: FileText },
+  { href: "/cuotas", label: "Cuotas", icon: Wallet },
   { href: "/vecinos", label: "Vecinos", icon: Users },
   { href: "/invitar", label: "Invitar vecinos", icon: UserPlus, roles: ["PRESIDENT", "SECRETARY"] },
   { href: "/unidades", label: "Viviendas", icon: Building2, roles: ["PRESIDENT", "SECRETARY", "TREASURER"] },

@@ -40,6 +40,7 @@ presidentes and vecinos. Product docs live in `docs/`.
 npm run dev          # local dev
 npm run lint         # eslint
 npm run typecheck    # next typegen && tsc
+npm test             # vitest (domain logic: LPH rules, cuotas)
 npm run build        # production build
 npm run db:migrate   # create/apply migrations (uses DIRECT_URL)
 npm run db:deploy    # apply migrations in prod
@@ -50,3 +51,13 @@ New migrations: edit `prisma/schema.prisma`, then `npm run db:migrate -- --name 
 ## Git
 
 - Conventional commits (`feat:`, `fix:`, `chore:`…). Never push to `main`; one branch + PR per phase.
+
+## Domain notes
+
+- LPH logic (quorum, majorities, notice periods) is pure and unit-tested in `src/lib/lph.ts`.
+  Ordinary juntas require ≥ 6 days notice (art. 16.3, enforced); the UI recommends 15.
+  Owners in arrears at the start of a junta cannot vote and are excluded from majorities (art. 15.2).
+- Cuotas: one `Cuota` row per unit/month (or derrama installment), idempotent via `Cuota.key`.
+  Overdue is computed (`PENDING` + past `dueDate`), not stored. Derramas split by coefficient with the
+  largest-remainder method (`splitByCoefficient`) so cents always add up.
+- Daily cron `/api/cron/daily` (Vercel, `CRON_SECRET`) generates cuotas and sends reminders.
