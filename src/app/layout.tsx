@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ServiceWorkerRegister } from "@/components/sw-register";
 import { Toaster } from "@/components/ui/sonner";
 import { appUrl } from "@/lib/urls";
 import "./globals.css";
@@ -18,6 +19,7 @@ export const metadata: Metadata = {
   description:
     "Anuncios, incidencias, documentos, juntas y cuotas de tu comunidad de propietarios en una sola app. Gratis hasta 10 viviendas.",
   applicationName: "Mi Comunidad",
+  appleWebApp: { capable: true, title: "Mi Comunidad", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
@@ -38,6 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
           <Toaster richColors position="top-center" />
+          <ServiceWorkerRegister />
         </ThemeProvider>
       </body>
     </html>

@@ -12,7 +12,7 @@ export function ProfileForm({
   units,
 }: {
   comunidadId: string;
-  member: { displayName: string; phone: string | null; email: string | null; unitId: string | null };
+  member: { displayName: string; phone: string | null; email: string | null; unitId: string | null; notifyEmail: boolean };
   units: { id: string; label: string }[];
 }) {
   const [state, action] = useActionState(updateMyProfile, {});
@@ -41,6 +41,13 @@ export function ProfileForm({
           <Input id="email" name="email" type="email" defaultValue={member.email ?? ""} />
         </Field>
       </div>
+      <fieldset className="space-y-2 rounded-xl border p-4">
+        <legend className="px-1 text-sm font-medium">Notificaciones</legend>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="notifyEmail" defaultChecked={member.notifyEmail} className="accent-primary" />
+          Recibir anuncios, incidencias y juntas por email
+        </label>
+      </fieldset>
       <SubmitButton>Guardar perfil</SubmitButton>
     </form>
   );

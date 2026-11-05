@@ -5,10 +5,14 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Building2,
+  FileText,
   Home,
+  Megaphone,
   Menu,
   Settings,
   UserPlus,
+  Users,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import type { MemberRole } from "@/generated/prisma/enums";
@@ -27,6 +31,10 @@ interface NavItem {
 // Order matters: this is the sidebar order. Sub-paths are relative to /c/[id].
 const NAV_ITEMS: NavItem[] = [
   { href: "", label: "Inicio", icon: Home, primary: true },
+  { href: "/anuncios", label: "Anuncios", icon: Megaphone, primary: true },
+  { href: "/incidencias", label: "Incidencias", icon: Wrench, primary: true },
+  { href: "/documentos", label: "Documentos", icon: FileText, primary: true },
+  { href: "/vecinos", label: "Vecinos", icon: Users },
   { href: "/invitar", label: "Invitar vecinos", icon: UserPlus, roles: ["PRESIDENT", "SECRETARY"] },
   { href: "/unidades", label: "Viviendas", icon: Building2, roles: ["PRESIDENT", "SECRETARY", "TREASURER"] },
   { href: "/ajustes", label: "Ajustes", icon: Settings },
