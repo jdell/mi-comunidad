@@ -1,0 +1,268 @@
+// Mi-Comunidad data model.
+// Conventions: money is stored in EUR cents (Int); ownership coefficients are
+// stored as percentages with 4 decimals (Decimal(7,4)), summing ~100 per comunidad.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MemberRole {
+  PRESIDENT
+  SECRETARY
+  TREASURER
+  VECINO
+}
+
+enum MemberStatus {
+  PENDING
+  ACTIVE
+  REMOVED
+}
+
+enum ApprovalMode {
+  AUTOMATIC
+  MANUAL
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
+enum IncidenciaStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum IncidenciaPriority {
+  NORMAL
+  URGENT
+}
+
+enum IncidenciaLocation {
+  PORTAL
+  ESCALERA
+  ASCENSOR
+  GARAJE
+  TERRAZA
+  FACHADA
+  PISCINA
+  ZONAS_COMUNES
+  OTRO
+}
+
+enum DocumentCategory {
+  ACTA
+  ESTATUTOS
+  SEGURO
+  PRESUPUESTO
+  CONTRATO
+  FACTURA
+  CERTIFICADO
+  OTRO
+}
+
+/// Mirrors a Supabase auth user. `id` is the Supabase auth.users UUID.
+model User {
+  id        String   @id @db.Uuid
+  email     String?  @unique
+  phone     String?  @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships         ComunidadMember[]
+  invitationsSent     Invitation[]      @relation("InvitationCreatedBy")
+  invitationsAccepted Invitation[]      @relation("InvitationAcceptedBy")
+}
+
+model Comunidad {
+  id           String       @id @default(cuid())
+  name         String
+  address      String
+  city         String?
+  postalCode   String?
+  cif          String?
+  unitsCount   Int
+  inviteCode   String       @unique
+  approvalMode ApprovalMode @default(AUTOMATIC)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  units         Unit[]
+  members       ComunidadMember[]
+  invitations   Invitation[]
+  announcements Announcement[]
+  incidencias   Incidencia[]
+  documents     Document[]
+}
+
+/// A flat, local, garage or storage room with its ownership coefficient (LPH art. 5).
+model Unit {
+  id          String   @id @default(cuid())
+  comunidadId String
+  label       String
+  floor       String?
+  door        String?
+  coefficient Decimal  @default(0) @db.Decimal(7, 4)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  comunidad   Comunidad         @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  members     ComunidadMember[]
+  invitations Invitation[]
+
+  @@unique([comunidadId, label])
+  @@index([comunidadId])
+}
+
+model ComunidadMember {
+  id          String       @id @default(cuid())
+  comunidadId String
+  userId      String       @db.Uuid
+  unitId      String?
+  role        MemberRole   @default(VECINO)
+  status      MemberStatus @default(ACTIVE)
+  displayName String
+  phone       String?
+  email       String?
+  /// Notification preference: receive notifications by email.
+  notifyEmail Boolean      @default(true)
+  joinedAt    DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  comunidad Comunidad @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unit      Unit?     @relation(fields: [unitId], references: [id], onDelete: SetNull)
+
+  announcements     Announcement[]
+  announcementReads AnnouncementRead[]
+  incidencias       Incidencia[]
+  incidenciaUpdates IncidenciaUpdate[]
+  documents         Document[]
+
+  @@unique([comunidadId, userId])
+  @@index([userId])
+  @@index([unitId])
+}
+
+model Invitation {
+  id           String           @id @default(cuid())
+  comunidadId  String
+  code         String           @unique
+  unitId       String?
+  name         String?
+  email        String?
+  phone        String?
+  role         MemberRole       @default(VECINO)
+  status       InvitationStatus @default(PENDING)
+  createdById  String           @db.Uuid
+  acceptedById String?          @db.Uuid
+  sentAt       DateTime?
+  acceptedAt   DateTime?
+  expiresAt    DateTime?
+  createdAt    DateTime         @default(now())
+
+  comunidad  Comunidad @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  unit       Unit?     @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  createdBy  User      @relation("InvitationCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  acceptedBy User?     @relation("InvitationAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([comunidadId])
+}
+
+model Announcement {
+  id              String    @id @default(cuid())
+  comunidadId     String
+  authorId        String
+  title           String
+  body            String
+  imagePath       String?
+  pinned          Boolean   @default(false)
+  urgent          Boolean   @default(false)
+  notifyEmail     Boolean   @default(true)
+  notifiedAt      DateTime?
+  recipientsCount Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  comunidad Comunidad          @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  author    ComunidadMember    @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  reads     AnnouncementRead[]
+
+  @@index([comunidadId, pinned, createdAt])
+}
+
+model AnnouncementRead {
+  announcementId String
+  memberId       String
+  readAt         DateTime @default(now())
+
+  announcement Announcement    @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  member       ComunidadMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@id([announcementId, memberId])
+}
+
+model Incidencia {
+  id          String             @id @default(cuid())
+  comunidadId String
+  reporterId  String
+  title       String
+  description String
+  location    IncidenciaLocation @default(OTRO)
+  priority    IncidenciaPriority @default(NORMAL)
+  status      IncidenciaStatus   @default(OPEN)
+  /// Free text: provider or person handling it (e.g. "Thyssen").
+  assignedTo  String?
+  photoPaths  String[]
+  resolvedAt  DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  comunidad Comunidad          @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  reporter  ComunidadMember    @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  updates   IncidenciaUpdate[]
+
+  @@index([comunidadId, status])
+}
+
+model IncidenciaUpdate {
+  id           String            @id @default(cuid())
+  incidenciaId String
+  authorId     String
+  status       IncidenciaStatus?
+  note         String?
+  createdAt    DateTime          @default(now())
+
+  incidencia Incidencia      @relation(fields: [incidenciaId], references: [id], onDelete: Cascade)
+  author     ComunidadMember @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([incidenciaId])
+}
+
+model Document {
+  id           String           @id @default(cuid())
+  comunidadId  String
+  uploadedById String
+  title        String
+  category     DocumentCategory
+  year         Int
+  storagePath  String
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  createdAt    DateTime         @default(now())
+
+  comunidad  Comunidad       @relation(fields: [comunidadId], references: [id], onDelete: Cascade)
+  uploadedBy ComunidadMember @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@index([comunidadId, year])
+}
