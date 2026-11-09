@@ -3,8 +3,49 @@
     "Notices for all neighbours",
     "Votes",
     "Report and track incidents",
-    "Shared accounts",
-    "Free for residents"
+    "Shared accounts"
   ],
-  "recentUpdates": []
+  "recentUpdates": [],
+  "marketing": {
+    "tone": "Neighbourly, clear and practical; makes self-management of a building feel easy",
+    "audience": "Presidents and residents of self-managed comunidades de propietarios in Spain",
+    "pillars": [
+      {
+        "name": "Coming soon",
+        "share": 0.3,
+        "description": "What Mi-Comunidad will help with, framed strictly as coming soon",
+        "usesFeatures": true
+      },
+      {
+        "name": "Community tips",
+        "share": 0.25,
+        "description": "General, practical tips for running a comunidad de vecinos well",
+        "usesFeatures": false
+      },
+      {
+        "name": "Neighbourly life",
+        "share": 0.2,
+        "description": "Living well with neighbours: communication, shared spaces, small courtesies",
+        "usesFeatures": false
+      },
+      {
+        "name": "Engagement",
+        "share": 0.25,
+        "description": "Questions for presidents and neighbours about their comunidad",
+        "usesFeatures": false
+      }
+    ],
+    "guardrails": [
+      "Not launched yet: present it only as coming soon and invite people to register interest; never say or imply it can be used today, and never describe a feature as available now",
+      "Never give legal advice on the Ley de Propiedad Horizontal; general good practice only",
+      "Never mention prices or a free plan",
+      "No engagement bait and no invented statistics",
+      "Spanish from Spain (es-ES)"
+    ],
+    "hashtags": [
+      "#MiComunidad",
+      "#ComunidadDeVecinos",
+      "#Vecinos"
+    ]
+  }
 }
