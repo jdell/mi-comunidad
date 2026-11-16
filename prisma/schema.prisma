@@ -41,6 +41,14 @@ enum SubscriptionStatus {
   CANCELED
 }
 
+enum IdeaStatus {
+  NEW
+  REVIEWING
+  PLANNED
+  COMPLETED
+  DISMISSED
+}
+
 enum BillingEventType {
   TRIAL_STARTED
   SUBSCRIBED
@@ -49,6 +57,8 @@ enum BillingEventType {
   PAYMENT_FAILED
   REFERRAL_CREDIT
   CANCELED
+  COURTESY_GRANTED
+  COURTESY_REVOKED
 }
 
 enum NotificationChannel {
@@ -174,6 +184,8 @@ model User {
   invitationsSent     Invitation[]      @relation("InvitationCreatedBy")
   invitationsAccepted Invitation[]      @relation("InvitationAcceptedBy")
   npsResponses        NpsResponse[]
+  featureIdeas        FeatureIdea[]
+  ideaVotes           IdeaVote[]
 }
 
 model Comunidad {
@@ -204,6 +216,8 @@ model Comunidad {
   trialEndsAt          DateTime?
   currentPeriodEnd     DateTime?
   cancelAtPeriodEnd    Boolean            @default(false)
+  /// Courtesy Pro granted by a platform admin. Expired (past) = no effect. Cleared by a paid subscription.
+  proGrantedUntil      DateTime?
 
   /// Engagement bookkeeping.
   onboardingDismissedAt DateTime?
@@ -240,6 +254,7 @@ model Comunidad {
   billingEvents BillingEvent[]
   notifications NotificationLog[]
   npsResponses  NpsResponse[]
+  featureIdeas  FeatureIdea[]
 
   @@index([referredById])
 }
@@ -635,4 +650,45 @@ model NpsResponse {
 
   @@index([userId, createdAt])
   @@index([createdAt])
+}
+
+/// Product feedback board ("Sugerencias"): platform-wide, not scoped to a comunidad.
+model FeatureIdea {
+  id           String     @id @default(cuid())
+  title        String
+  description  String
+  status       IdeaStatus @default(NEW)
+  /// Public answer from the team, shown on the board.
+  response     String?
+  /// Internal notes, admin only.
+  adminNote    String?
+  authorId     String?    @db.Uuid
+  /// Comunidad the author was in when submitting (context for admins only).
+  comunidadId  String?
+  /// Set when merged as a duplicate: votes moved to the target, hidden from the board.
+  mergedIntoId String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  author     User?         @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  comunidad  Comunidad?    @relation(fields: [comunidadId], references: [id], onDelete: SetNull)
+  mergedInto FeatureIdea?  @relation("IdeaMerges", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  merged     FeatureIdea[] @relation("IdeaMerges")
+  votes      IdeaVote[]
+
+  @@index([status])
+  @@index([mergedIntoId])
+  @@index([authorId, createdAt])
+}
+
+model IdeaVote {
+  ideaId    String
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  idea FeatureIdea @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([ideaId, userId])
+  @@index([userId])
 }

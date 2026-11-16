@@ -9,6 +9,7 @@ const ITEMS = [
   { href: "/admin/comunidades", label: "Comunidades" },
   { href: "/admin/ingresos", label: "Ingresos" },
   { href: "/admin/referidos", label: "Recomendaciones" },
+  { href: "/admin/sugerencias", label: "Sugerencias" },
 ];
 
 export function AdminNav() {

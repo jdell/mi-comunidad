@@ -66,6 +66,9 @@ New migrations: edit `prisma/schema.prisma`, then `npm run db:migrate -- --name 
   `StripeEvent`). What a comunidad can do is derived by `computeEntitlements` (`src/lib/entitlements.ts`):
   14-day in-app trial of Comunidad features, Gratis afterwards, read-only when over the plan's unit limit.
   Gate server actions with `requireMember(id, roles, { feature })` or `{ write: true }`.
+  Admins can grant courtesy Pro for a limited time (`Comunidad.proGrantedUntil`, `/admin/comunidades/[id]`, emails the
+  presidents); `effectiveTier` resolves paid > Administrador coverage > courtesy > trial > Gratis, expired grants are ignored,
+  and a paid Stripe subscription clears the grant.
   Lifecycle changes are logged to `BillingEvent` (MRR analytics). Create Stripe prices with `scripts/stripe-setup.ts`.
 - Platform admin at `/admin`: guarded by `requireAdmin()` (`src/lib/admin.ts`) against `ADMIN_EMAILS`
   (empty = nobody, fail closed; non-admins get a 404). Revenue maths in `src/lib/revenue.ts` (unit-tested).
@@ -73,6 +76,9 @@ New migrations: edit `prisma/schema.prisma`, then `npm run db:migrate -- --name 
   member) and/or email (Resend), logged in `NotificationLog`. Legal notices (convocatorias, debt reminders, actas,
   billing) always also go by email. Lifecycle emails to presidents live in `src/lib/retention.ts` and respect
   `User.productEmails`.
+- Sugerencias (`/sugerencias`, linked from the user menu): platform-wide idea board (`FeatureIdea`, `IdeaVote`, `IdeaStatus`).
+  Authors are never shown publicly (cross-comunidad). Labels/validation in `src/lib/ideas.ts`. Admin at `/admin/sugerencias`:
+  status, public response, internal notes, merge duplicates (votes move to the target, duplicate hidden).
 - GDPR: `/cuenta` offers data export (`/cuenta/exportar`) and erasure (anonymisation; presidents must hand over first).
   Legal identity for `/privacidad` and `/terminos` comes from `src/lib/legal.ts` (fill in before launch).
 - Referrals (`src/lib/referrals.ts`, pure code helpers in `src/lib/referral-code.ts`): lazy `MC-XXXX` code per comunidad,

@@ -30,7 +30,7 @@ export default async function AdminDashboard() {
         _count: { select: { members: { where: { status: "ACTIVE" } } } },
       },
     }),
-    db.comunidad.findMany({ select: { plan: true, subscriptionStatus: true, trialEndsAt: true, createdAt: true, unitsCount: true } }),
+    db.comunidad.findMany({ select: { plan: true, subscriptionStatus: true, trialEndsAt: true, createdAt: true, unitsCount: true, proGrantedUntil: true } }),
     db.npsResponse.findMany({ where: { score: { not: null }, createdAt: { gte: daysAgo(180) } }, select: { score: true } }),
     db.notificationLog.groupBy({ by: ["channel"], where: { createdAt: { gte: since30 } }, _count: true }),
   ]);

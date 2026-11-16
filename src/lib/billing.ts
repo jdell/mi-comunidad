@@ -36,6 +36,7 @@ export async function syncSubscription(sub: Stripe.Subscription, stripeEventId: 
   const active = status !== "CANCELED";
   const plan: Plan = active && pricedPlan ? pricedPlan : "GRATIS";
   const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
+  const isPaid = plan !== "GRATIS" && ["ACTIVE", "TRIALING", "PAST_DUE"].includes(status);
 
   await db.comunidad.update({
     where: { id: comunidadId },
@@ -46,11 +47,12 @@ export async function syncSubscription(sub: Stripe.Subscription, stripeEventId: 
       stripeSubscriptionId: active ? sub.id : null,
       currentPeriodEnd: subscriptionPeriodEnd(sub),
       cancelAtPeriodEnd: Boolean(sub.cancel_at_period_end || sub.cancel_at),
+      // A paid subscription supersedes any admin courtesy grant.
+      ...(isPaid ? { proGrantedUntil: null } : {}),
     },
   });
 
   const wasPaid = before.plan !== "GRATIS" && ["ACTIVE", "TRIALING", "PAST_DUE"].includes(before.subscriptionStatus);
-  const isPaid = plan !== "GRATIS" && ["ACTIVE", "TRIALING", "PAST_DUE"].includes(status);
   let type: BillingEventType | null = null;
   if (!wasPaid && isPaid) type = "SUBSCRIBED";
   else if (wasPaid && !isPaid) type = "CANCELED";

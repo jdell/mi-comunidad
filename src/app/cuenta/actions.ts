@@ -48,6 +48,8 @@ export async function deleteAccount(_prev: ActionState, formData: FormData): Pro
     }),
     db.invitation.updateMany({ where: { acceptedById: user.id }, data: { name: null, email: null, phone: null } }),
     db.npsResponse.updateMany({ where: { userId: user.id }, data: { comment: null } }),
+    // Suggestions stay on the board (product feedback) but are no longer linked to the person.
+    db.featureIdea.updateMany({ where: { authorId: user.id }, data: { authorId: null } }),
     db.user.update({ where: { id: user.id }, data: { name: null, email: null, phone: null, productEmails: false, deletedAt: new Date() } }),
   ]);
 

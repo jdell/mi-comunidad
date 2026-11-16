@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/admin";
 import { db } from "@/lib/db";
-import { computeEntitlements } from "@/lib/entitlements";
+import { COURTESY_PLAN, computeEntitlements } from "@/lib/entitlements";
 import { formatCents, formatDate, formatDateTime } from "@/lib/format";
 import { PLANS } from "@/lib/plans";
 import { ROLE_LABELS } from "@/lib/roles";
+import { CourtesyForm } from "./courtesy-form";
 
 export const metadata = { title: "Comunidad" };
 
@@ -22,6 +23,8 @@ const EVENT_LABELS: Record<string, string> = {
   PAYMENT_FAILED: "Pago fallido",
   CANCELED: "Cancelación",
   REFERRAL_CREDIT: "Mes gratis por recomendación",
+  COURTESY_GRANTED: "Cortesía Pro concedida",
+  COURTESY_REVOKED: "Cortesía Pro revocada",
 };
 
 export default async function AdminComunidad({ params }: PageProps<"/admin/comunidades/[id]">) {
@@ -70,6 +73,19 @@ export default async function AdminComunidad({ params }: PageProps<"/admin/comun
           <CardContent className="space-y-2 text-sm">
             <p>Plan: <Badge>{PLANS[c.plan].name}</Badge> · estado {c.subscriptionStatus.toLowerCase()} · efectivo: {PLANS[e.plan].name}</p>
             <p>Prueba: {e.trialActive ? `activa, termina ${formatDate(e.trialEndsAt)}` : `terminó ${formatDate(e.trialEndsAt)}`}</p>
+            <div className="space-y-2 rounded-lg border p-3">
+              <p className="font-medium">Cortesía {PLANS[COURTESY_PLAN].name}</p>
+              {e.paid ? (
+                <p className="text-muted-foreground">Tiene suscripción de pago: no aplica.</p>
+              ) : e.courtesy && e.courtesyEndsAt ? (
+                <p>Activa hasta el <strong>{formatDate(e.courtesyEndsAt)}</strong> ({e.courtesyDaysLeft === 1 ? "queda 1 día" : `quedan ${e.courtesyDaysLeft} días`}).</p>
+              ) : (
+                <p className="text-muted-foreground">
+                  {e.courtesyEndsAt ? `Expiró el ${formatDate(e.courtesyEndsAt)}.` : "Sin cortesía."} Se avisará al presidente por email.
+                </p>
+              )}
+              {!e.paid && <CourtesyForm comunidadId={c.id} active={e.courtesy} />}
+            </div>
             {e.readOnly && <p className="text-destructive">Solo lectura: supera el límite de {e.unitLimit} viviendas.</p>}
             {c.currentPeriodEnd && <p>Periodo actual hasta {formatDate(c.currentPeriodEnd)}{c.cancelAtPeriodEnd ? " (cancelará)" : ""}</p>}
             {c.stripeCustomerId && (

@@ -14,7 +14,12 @@ export interface BillingFields {
   trialEndsAt: Date | null;
   createdAt: Date;
   unitsCount: number;
+  /** Courtesy Pro granted by a platform admin (optional so narrow selects still type-check). */
+  proGrantedUntil?: Date | null;
 }
+
+/** Plan unlocked by an admin courtesy grant. */
+export const COURTESY_PLAN: PlanId = "PRO";
 
 export interface Entitlements {
   /** Plan whose features apply now. */
@@ -25,6 +30,11 @@ export interface Entitlements {
   trialDaysLeft: number;
   /** Covered by the president's Administrador subscription on another comunidad. */
   adminCovered: boolean;
+  /** Admin courtesy grant of Pro is active. */
+  courtesy: boolean;
+  /** End of the courtesy grant (may be in the past), or null if never granted. */
+  courtesyEndsAt: Date | null;
+  courtesyDaysLeft: number;
   unitLimit: number | null;
   /** More units than the effective plan allows: the comunidad becomes read-only. */
   overLimit: boolean;
@@ -37,14 +47,39 @@ export function trialEndFor(c: Pick<BillingFields, "trialEndsAt" | "createdAt">)
   return c.trialEndsAt ?? new Date(c.createdAt.getTime() + TRIAL_DAYS * DAY);
 }
 
+/** True when the comunidad holds a non-expired courtesy grant. */
+export function courtesyActive(c: Pick<BillingFields, "proGrantedUntil">, now = new Date()) {
+  return Boolean(c.proGrantedUntil && c.proGrantedUntil > now);
+}
+
+function isPaid(c: Pick<BillingFields, "plan" | "subscriptionStatus">) {
+  return c.plan !== "GRATIS" && (PAID_STATUSES as readonly string[]).includes(c.subscriptionStatus);
+}
+
+/**
+ * The single source of truth for which plan's features apply right now.
+ * Precedence: paid subscription > Administrador coverage > courtesy grant (Pro) > in-app trial > Gratis.
+ * An expired courtesy grant has no effect (falls through to trial/Gratis).
+ */
+export function effectiveTier(c: BillingFields, opts: { adminCovered?: boolean; now?: Date } = {}): PlanId {
+  const now = opts.now ?? new Date();
+  if (isPaid(c)) return c.plan;
+  if (opts.adminCovered) return "ADMINISTRADOR";
+  if (courtesyActive(c, now)) return COURTESY_PLAN;
+  if (trialEndFor(c) > now) return "COMUNIDAD";
+  return "GRATIS";
+}
+
 export function computeEntitlements(c: BillingFields, opts: { adminCovered?: boolean; now?: Date } = {}): Entitlements {
   const now = opts.now ?? new Date();
-  const paid = c.plan !== "GRATIS" && (PAID_STATUSES as readonly string[]).includes(c.subscriptionStatus);
+  const paid = isPaid(c);
   const trialEndsAt = trialEndFor(c);
   const adminCovered = !paid && Boolean(opts.adminCovered);
-  const trialActive = !paid && !adminCovered && trialEndsAt > now;
+  const plan = effectiveTier(c, { adminCovered, now });
+  const courtesy = !paid && !adminCovered && courtesyActive(c, now);
+  const trialActive = !paid && !adminCovered && !courtesy && trialEndsAt > now;
+  const courtesyEndsAt = c.proGrantedUntil ?? null;
 
-  const plan: PlanId = paid ? c.plan : adminCovered ? "ADMINISTRADOR" : trialActive ? "COMUNIDAD" : "GRATIS";
   // During the trial the unit limit is not enforced, so large buildings can try the product.
   const unitLimit = trialActive ? null : PLANS[plan].maxUnits;
   const overLimit = unitLimit !== null && c.unitsCount > unitLimit;
@@ -56,6 +91,9 @@ export function computeEntitlements(c: BillingFields, opts: { adminCovered?: boo
     trialEndsAt,
     trialDaysLeft: Math.max(0, Math.ceil((trialEndsAt.getTime() - now.getTime()) / DAY)),
     adminCovered,
+    courtesy,
+    courtesyEndsAt,
+    courtesyDaysLeft: courtesy && courtesyEndsAt ? Math.max(0, Math.ceil((courtesyEndsAt.getTime() - now.getTime()) / DAY)) : 0,
     unitLimit,
     overLimit,
     readOnly: overLimit,

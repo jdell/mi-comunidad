@@ -16,7 +16,7 @@ export async function ReferralCard({ comunidadId }: { comunidadId: string }) {
     db.comunidad.findUniqueOrThrow({ where: { id: comunidadId }, select: { plan: true, referralCreditPendingCents: true } }),
     db.comunidad.findMany({
       where: { referredById: comunidadId },
-      select: { id: true, name: true, city: true, createdAt: true, plan: true, subscriptionStatus: true, trialEndsAt: true, unitsCount: true, referralConvertedAt: true, referralRewardCents: true },
+      select: { id: true, name: true, city: true, createdAt: true, plan: true, subscriptionStatus: true, trialEndsAt: true, unitsCount: true, proGrantedUntil: true, referralConvertedAt: true, referralRewardCents: true },
       orderBy: { createdAt: "desc" },
     }),
   ]);

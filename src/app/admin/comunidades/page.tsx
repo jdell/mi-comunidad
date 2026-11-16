@@ -69,7 +69,7 @@ export default async function AdminComunidades({ searchParams }: PageProps<"/adm
                     </td>
                     <td><Badge variant={c.plan === "GRATIS" ? "outline" : "default"}>{PLANS[c.plan].name}</Badge></td>
                     <td className="text-xs">
-                      {e.trialActive ? <Badge variant="secondary">Prueba · {e.trialDaysLeft} d</Badge> : e.readOnly ? <Badge variant="destructive">Solo lectura</Badge> : STATUS[c.subscriptionStatus]}
+                      {e.courtesy ? <Badge variant="secondary">Cortesía Pro · {e.courtesyDaysLeft} d</Badge> : e.trialActive ? <Badge variant="secondary">Prueba · {e.trialDaysLeft} d</Badge> : e.readOnly ? <Badge variant="destructive">Solo lectura</Badge> : STATUS[c.subscriptionStatus]}
                     </td>
                     <td className="text-right">{c.unitsCount}</td>
                     <td className="text-right">{c._count.members}</td>

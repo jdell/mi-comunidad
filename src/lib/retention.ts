@@ -18,7 +18,7 @@ async function presidentsOf(comunidadId: string, opts: { productOnly: boolean })
     .filter((p): p is { memberId: string; name: string; email: string } => Boolean(p.email));
 }
 
-async function sendToPresidents(
+export async function sendToPresidents(
   comunidadId: string,
   event: string,
   productOnly: boolean,
