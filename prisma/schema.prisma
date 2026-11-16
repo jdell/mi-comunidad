@@ -49,6 +49,8 @@ enum BillingEventType {
   PAYMENT_FAILED
   REFERRAL_CREDIT
   CANCELED
+  COURTESY_GRANTED
+  COURTESY_REVOKED
 }
 
 enum NotificationChannel {
@@ -204,6 +206,8 @@ model Comunidad {
   trialEndsAt          DateTime?
   currentPeriodEnd     DateTime?
   cancelAtPeriodEnd    Boolean            @default(false)
+  /// Courtesy Pro granted by a platform admin. Expired (past) = no effect. Cleared by a paid subscription.
+  proGrantedUntil      DateTime?
 
   /// Engagement bookkeeping.
   onboardingDismissedAt DateTime?

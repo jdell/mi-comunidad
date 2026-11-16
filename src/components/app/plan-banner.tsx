@@ -26,6 +26,9 @@ export function PlanBanner({
   } else if (e.pastDue) {
     tone = "warning";
     text = "No hemos podido cobrar la suscripción. Actualiza el método de pago.";
+  } else if (e.courtesy && e.courtesyDaysLeft <= 7) {
+    tone = "info";
+    text = `${PLANS[e.plan].name} de cortesía: ${e.courtesyDaysLeft === 1 ? "queda 1 día" : `quedan ${e.courtesyDaysLeft} días`}.`;
   } else if (e.trialActive && e.trialDaysLeft <= 7) {
     tone = "info";
     text = `Prueba del plan Comunidad: ${e.trialDaysLeft === 1 ? "queda 1 día" : `quedan ${e.trialDaysLeft} días`}.`;

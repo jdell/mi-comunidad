@@ -66,6 +66,9 @@ New migrations: edit `prisma/schema.prisma`, then `npm run db:migrate -- --name 
   `StripeEvent`). What a comunidad can do is derived by `computeEntitlements` (`src/lib/entitlements.ts`):
   14-day in-app trial of Comunidad features, Gratis afterwards, read-only when over the plan's unit limit.
   Gate server actions with `requireMember(id, roles, { feature })` or `{ write: true }`.
+  Admins can grant courtesy Pro for a limited time (`Comunidad.proGrantedUntil`, `/admin/comunidades/[id]`, emails the
+  presidents); `effectiveTier` resolves paid > Administrador coverage > courtesy > trial > Gratis, expired grants are ignored,
+  and a paid Stripe subscription clears the grant.
   Lifecycle changes are logged to `BillingEvent` (MRR analytics). Create Stripe prices with `scripts/stripe-setup.ts`.
 - Platform admin at `/admin`: guarded by `requireAdmin()` (`src/lib/admin.ts`) against `ADMIN_EMAILS`
   (empty = nobody, fail closed; non-admins get a 404). Revenue maths in `src/lib/revenue.ts` (unit-tested).

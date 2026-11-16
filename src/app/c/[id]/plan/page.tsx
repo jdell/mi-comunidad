@@ -76,10 +76,13 @@ export default async function PlanPage({ params, searchParams }: PageProps<"/c/[
             {PLANS[e.plan].name}
             {e.trialActive && <Badge>Prueba gratuita · {e.trialDaysLeft} días</Badge>}
             {e.adminCovered && <Badge variant="secondary">Incluido en tu plan Administrador</Badge>}
+            {e.courtesy && <Badge>Cortesía · {e.courtesyDaysLeft === 1 ? "1 día" : `${e.courtesyDaysLeft} días`}</Badge>}
             {subscribed && <Badge variant={e.pastDue ? "destructive" : "secondary"}>{STATUS[comunidad.subscriptionStatus]}</Badge>}
           </CardTitle>
           <CardDescription>
-            {e.trialActive
+            {e.courtesy && e.courtesyEndsAt
+              ? `El equipo de Mi Comunidad te ha regalado el plan ${PLANS[e.plan].name} hasta el ${formatDate(e.courtesyEndsAt)}. Después pasarás al plan ${e.trialEndsAt > e.courtesyEndsAt ? "Comunidad (prueba)" : "Gratis"} salvo que te suscribas; al suscribirte, la cortesía se sustituye por tu plan.`
+              : e.trialActive
               ? `Disfrutas de todas las funciones del plan Comunidad hasta el ${formatDate(e.trialEndsAt)}. Después pasarás al plan Gratis${comunidad.unitsCount > 10 ? " en modo solo lectura (tu comunidad tiene más de 10 viviendas)" : ""}.`
               : subscribed && comunidad.currentPeriodEnd
                 ? comunidad.cancelAtPeriodEnd
