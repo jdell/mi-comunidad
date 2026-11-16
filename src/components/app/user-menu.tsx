@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, LogOut, Monitor, Moon, Shield, Sun, UserRound } from "lucide-react";
+import { Building2, Lightbulb, LogOut, Monitor, Moon, Shield, Sun, UserRound } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { initials } from "@/lib/format";
 
-export function UserMenu({ name, isAdmin = false }: { name: string; isAdmin?: boolean }) {
+export function UserMenu({ name, isAdmin = false, comunidadId }: { name: string; isAdmin?: boolean; comunidadId?: string }) {
   const { theme, setTheme } = useTheme();
   return (
     <DropdownMenu>
@@ -41,6 +41,11 @@ export function UserMenu({ name, isAdmin = false }: { name: string; isAdmin?: bo
         <DropdownMenuItem asChild>
           <Link href="/cuenta">
             <UserRound /> Mi cuenta
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={comunidadId ? `/sugerencias?c=${comunidadId}` : "/sugerencias"}>
+            <Lightbulb /> Sugerencias
           </Link>
         </DropdownMenuItem>
         {isAdmin && (

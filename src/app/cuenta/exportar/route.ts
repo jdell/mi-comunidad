@@ -20,13 +20,19 @@ export async function GET() {
       notificationLogs: { select: { channel: true, event: true, success: true, createdAt: true } },
     },
   });
-  const nps = await db.npsResponse.findMany({ where: { userId: user.id }, select: { score: true, comment: true, createdAt: true } });
+  const [nps, ideas, ideaVotes] = await Promise.all([
+    db.npsResponse.findMany({ where: { userId: user.id }, select: { score: true, comment: true, createdAt: true } }),
+    db.featureIdea.findMany({ where: { authorId: user.id }, select: { title: true, description: true, status: true, createdAt: true } }),
+    db.ideaVote.findMany({ where: { userId: user.id }, select: { createdAt: true, idea: { select: { title: true } } } }),
+  ]);
 
   const data = {
     exportedAt: new Date().toISOString(),
     account: { id: user.id, name: user.name, email: user.email, phone: user.phone, createdAt: user.createdAt, productEmails: user.productEmails },
     memberships,
     nps,
+    ideas,
+    ideaVotes,
   };
   return new NextResponse(JSON.stringify(data, null, 2), {
     headers: {

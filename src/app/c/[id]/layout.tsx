@@ -40,7 +40,7 @@ export default async function ComunidadLayout({ children, params }: LayoutProps<
             </div>
           </Link>
           <div className="hidden md:block" />
-          <UserMenu name={member.displayName || user.name || "Mi cuenta"} isAdmin={isPlatformAdminEmail(user.email)} />
+          <UserMenu name={member.displayName || user.name || "Mi cuenta"} isAdmin={isPlatformAdminEmail(user.email)} comunidadId={id} />
         </header>
         <PlanBanner comunidadId={id} entitlements={entitlements} unitsCount={comunidad.unitsCount} canManage={member.role === "PRESIDENT"} />
         <main className="mx-auto w-full max-w-5xl flex-1 p-4 pb-24 md:p-8 md:pb-8">{children}</main>

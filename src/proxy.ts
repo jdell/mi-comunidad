@@ -5,7 +5,7 @@ import { safeNext } from "@/lib/urls";
 
 // Routes that require an authenticated session. Fine-grained authorization
 // (membership, roles, platform admin) is enforced again server-side.
-const PROTECTED_PREFIXES = ["/c", "/onboarding", "/cuenta", "/admin"];
+const PROTECTED_PREFIXES = ["/c", "/onboarding", "/cuenta", "/admin", "/sugerencias"];
 
 function isProtected(pathname: string) {
   return PROTECTED_PREFIXES.some(
